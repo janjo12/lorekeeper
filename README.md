@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+┌───────────────────────────────────┐
+│             category              │
+├───────────────────────────────────┤
+│ PK  id                            │
+│ FK  parent_category_id            │──┐
+│     name                          │  │
+└───────────────────────────────────┘  │
+           ▲                           │
+           └───────────────────────────┘
+       category.parent_category_id
+              → category.id
 
-## Getting Started
 
-First, run the development server:
+┌───────────────────────────────────┐
+│              entity               │
+├───────────────────────────────────┤
+│ PK  id                            │
+│ FK  category_id                   │──────────→ category.id
+│     name                          │
+└───────────────────────────────────┘
+          │             │            │
+          │             │            │
+          ▼             ▼            ▼
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+┌───────────────────────┐  ┌───────────────────────┐
+│    entity_textbox     │  │      entity_image     │
+├───────────────────────┤  ├───────────────────────┤
+│ PK  id                │  │ PK  id                │
+│ FK  entity_id         │  │ FK  entity_id         │
+│     text              │  │     url               │
+└───────────────────────┘  └───────────────────────┘
+          │                         │
+          ▼                         ▼
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+┌───────────────────────────┐  ┌───────────────────────────┐
+│    textbox_knowledge      │  │     image_knowledge       │
+├───────────────────────────┤  ├───────────────────────────┤
+│ PK, FK entity_textbox_id  │  │ PK, FK entity_image_id    │
+│ PK, FK player_id          │  │ PK, FK player_id          │
+└───────────────────────────┘  └───────────────────────────┘
+                  
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+┌───────────────────────┐
+│          tag          │
+├───────────────────────┤
+│ PK  id                │
+│     name              │
+└───────────────────────┘
+          │
+          ▼
 
-## Learn More
+┌───────────────────────────┐
+│        entity_tag         │
+├───────────────────────────┤
+│ PK, FK entity_id          │──────────→ entity.id
+│ PK, FK tag_id             │──────────→ tag.id
+└───────────────────────────┘
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+┌───────────────────────────────────┐
+│              comment              │
+├───────────────────────────────────┤
+│ PK  id                            │
+│ FK  entity_id                     │──────────→ entity.id
+│ FK  player_id                     │──────────→ player.id
+│     text                          │
+└───────────────────────────────────┘
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+If category_id or parent_category_id are null, that entity or category is top-level and is not part of another category.
+If player_id is null in either textbox_knowledge or image_knowledge, that textbox or image is available to all players.
