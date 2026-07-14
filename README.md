@@ -77,5 +77,13 @@
 │     text                          │
 └───────────────────────────────────┘
 
+┌───────────────────────────────────┐     
+│         campaign_player           │     
+├───────────────────────────────────┤
+| FK  campaign_id                   |──────────→ campaign.id
+│ FK  user_id                       │
+└───────────────────────────────────┘
+
+User_id in the campaign table represents the campaign's owner (GM); in all other tables, it means a player in the campaign.
 If category_id or parent_category_id are null, that entity or category is top-level and is not part of another category.
 If user_id is null in either textbox_knowledge or image_knowledge, that textbox or image is available to all players.
