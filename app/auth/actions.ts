@@ -34,7 +34,7 @@ export async function signup(_state: AuthState, formData: FormData): Promise<Aut
     console.error("Signup failed", error);
     return { message: authErrorMessage(error, "We could not create your account.") };
   }
-  redirect("/lore");
+  redirect("/data/campaigns");
 }
 
 export async function login(_state: AuthState, formData: FormData): Promise<AuthState> {
@@ -48,12 +48,12 @@ export async function login(_state: AuthState, formData: FormData): Promise<Auth
     console.error("Login failed", error);
     return { message: authErrorMessage(error, "Invalid username or password.") };
   }
-  redirect("/lore");
+  redirect("/data/campaigns");
 }
 
 export async function logout() {
   await deleteSession();
-  redirect("/login");
+  redirect("/auth/login");
 }
 
 function authErrorMessage(error: unknown, fallback: string) {

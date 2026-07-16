@@ -41,6 +41,11 @@ describe("dataloader", () => {
     const { signupUser } = await loadDataloader();
 
     await expect(signupUser("keeper", "long-password")).resolves.toEqual(profile);
+    expect(database.auth.admin.createUser).toHaveBeenCalledWith(expect.objectContaining({
+      phone: expect.stringMatching(/^\+1\d{10}$/),
+      phone_confirm: true,
+    }));
+    expect(database.auth.admin.createUser.mock.calls[0][0]).not.toHaveProperty("email");
   });
 
   it("logs in valid credentials and returns the matching public profile", async () => {
@@ -53,6 +58,10 @@ describe("dataloader", () => {
     const { loginUser } = await loadDataloader();
 
     await expect(loginUser("scribe", "long-password")).resolves.toEqual(profile);
+    expect(authClient.auth.signInWithPassword).toHaveBeenCalledWith({
+      phone: expect.stringMatching(/^\+1\d{10}$/),
+      password: "long-password",
+    });
   });
 
   it("repairs a missing profile when signup is retried for the same credentials", async () => {
@@ -60,7 +69,7 @@ describe("dataloader", () => {
     const database = {
       auth: { admin: { createUser: vi.fn().mockResolvedValue({
         data: { user: null },
-        error: { message: "already registered", code: "email_exists" },
+        error: { message: "already registered", code: "phone_exists" },
       }) } },
       from: vi.fn(() => queryReturning({ data: profile, error: null })),
     };

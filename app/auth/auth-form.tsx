@@ -38,7 +38,7 @@ export function AuthForm({ mode, action }: Props) {
       </button>
       <p className="auth-switch">
         {signingUp ? "Already have an account?" : "New to Lorekeeper?"}{" "}
-        <Link href={signingUp ? "/login" : "/signup"}>{signingUp ? "Sign in" : "Create an account"}</Link>
+        <Link href={signingUp ? "/auth/login" : "/auth/signup"}>{signingUp ? "Sign in" : "Create an account"}</Link>
       </p>
     </form>
   );

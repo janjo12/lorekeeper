@@ -112,7 +112,16 @@ Supabase queries directly.
 │ FK  profile_id                    │
 └───────────────────────────────────┘
 
-Profile_id in the campaign table represents the campaign's owner (GM); in all other tables, it means a player in the campaign.
+┌───────────────────────────────────┐     
+│             profile               │     
+├───────────────────────────────────┤
+| FK  user_id                       |──────────→ auth.users.id
+|     username                      |
+|     last_campaign                 |
+|     theme_setting                 |
+└───────────────────────────────────┘
+
+Profile_id in user_preferences can be any user. Profile_id in the campaign table represents the campaign's owner (GM). In all other tables, it means a player in the campaign.
 If category_id or parent_category_id are null, that entity or category is top-level and is not part of another category.
 If profile_id is null in either textbox_knowledge or image_knowledge, that textbox or image is available to all players.
 Entity and category names are unique within, but not across, each campaign. Entity names must be unique so that you can hyperlink to them easily in textboxes (frontend feature).

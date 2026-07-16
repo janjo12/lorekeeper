@@ -4,7 +4,7 @@ import { signup } from "@/app/auth/actions";
 import { getSession } from "@/lib/session";
 
 export default async function SignupPage() {
-  if (await getSession()) redirect("/lore");
+  if (await getSession()) redirect("/data/campaigns");
   return (
     <main className="auth-shell">
       <section className="auth-card">

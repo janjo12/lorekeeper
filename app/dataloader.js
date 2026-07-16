@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 let client;
@@ -26,8 +27,22 @@ function throwIfError(error, context) {
   throw databaseError;
 }
 
-function authIdentifier(username) {
-  return `${username}@lorekeeper.invalid`;
+function authPhone(username) {
+  const digits = createHash("sha256")
+    .update(`lorekeeper:${username}`)
+    .digest()
+    .subarray(0, 8)
+    .reduce((value, byte) => (value * 256n) + BigInt(byte), 0n)
+    .toString()
+    .padStart(20, "0")
+    .slice(-10);
+  return `+1${digits}`;
+}
+
+function isExistingAuthIdentity(error) {
+  return error?.code === "phone_exists"
+    || error?.code === "user_already_exists"
+    || /already registered|already exists/i.test(error?.message ?? "");
 }
 
 function createAuthClient() {
@@ -49,17 +64,18 @@ async function ensureProfile(database, userId, username) {
 
 export async function signupUser(username, password) {
   const database = getDatabase();
+  const phone = authPhone(username);
   const { data, error } = await database.auth.admin.createUser({
-    email: authIdentifier(username),
+    phone,
     password,
-    email_confirm: true,
+    phone_confirm: true,
     user_metadata: { username },
   });
 
   let user = data?.user;
-  if (error?.code === "email_exists") {
+  if (isExistingAuthIdentity(error)) {
     const existing = await createAuthClient().auth.signInWithPassword({
-      email: authIdentifier(username),
+      phone,
       password,
     });
     if (existing.error) throwIfError(error, "Could not create user");
@@ -72,9 +88,10 @@ export async function signupUser(username, password) {
 }
 
 export async function loginUser(username, password) {
+  const phone = authPhone(username);
   const database = getDatabase();
   const { data, error } = await createAuthClient().auth.signInWithPassword({
-    email: authIdentifier(username),
+    phone,
     password,
   });
   throwIfError(error, "Invalid email or password");
