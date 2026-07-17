@@ -182,7 +182,17 @@ export async function getCampaignLore(campaignId, userId) {
     requested_campaign_id: campaignId,
   });
   throwIfError(error, "Could not load campaign lore");
-  return data;
+  if (!data) return data;
+
+  // Categories belong to the campaign GM. Joined players need the same tree so
+  // the page can reveal only branches containing content visible to them.
+  const { data: categories, error: categoriesError } = await getDatabase()
+    .from("category")
+    .select("id, name, parent_category_id")
+    .eq("user_id", data.campaign.user_id)
+    .order("name");
+  throwIfError(categoriesError, "Could not load campaign categories");
+  return { ...data, categories: categories ?? [] };
 }
 
 export async function getTagsForUser(userId) {
@@ -232,13 +242,13 @@ export async function createLoreEntity(campaignId, userId, name, categoryId) {
   return data;
 }
 
-export async function getEntityView(entityId, userId) {
+export async function getEntityView(entityId, userId, { signImages = true } = {}) {
   const { data, error } = await getDatabase().rpc("get_entity_view", {
     requesting_user_id: userId,
     requested_entity_id: entityId,
   });
   throwIfError(error, "Could not load entity");
-  if (!data?.images?.length) return data;
+  if (!signImages || !data?.images?.length) return data;
   const paths = data.images.map((image) => image.storage_path);
   const { data: signedImages, error: signedImagesError } = await getDatabase()
     .storage.from("entity-images")

@@ -61,6 +61,10 @@ export default function EntityContentFab({ entityId }: { entityId: string }) {
                 ? "Add written lore to this entity."
                 : "Upload an image. Files are private and shown through temporary links."}
             </p>
+            <p>
+              Use another entity&apos;s exact, case-sensitive name in a content name or textbox to
+              create a link. Players only receive links to entities visible to them.
+            </p>
             <form
               action={async (data) => {
                 await (mode === "textbox" ? createEntityTextbox(data) : createEntityImage(data));

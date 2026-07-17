@@ -1203,6 +1203,24 @@ input {
   border-radius: 1rem;
   background: var(--surface);
 }
+.entity-reference-link,
+.entity-reference-link:visited {
+  color: var(--fab);
+  font-weight: 700;
+  text-decoration: none;
+  text-decoration-thickness: 0.1em;
+  text-underline-offset: 0.16em;
+}
+.entity-reference-link:hover,
+.entity-reference-link:focus-visible {
+  color: var(--fab-hover);
+  text-decoration-line: underline;
+}
+.entity-reference-link:focus-visible {
+  border-radius: 0.15em;
+  outline: 2px solid var(--fab);
+  outline-offset: 2px;
+}
 .content-card-header {
   display: flex;
   flex-wrap: wrap;

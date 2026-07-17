@@ -2,6 +2,7 @@ import Link from "next/link";
 import EntityContentFab from "@/app/data/campaign-lore/entity-content-fab";
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
 import ContentRevealButton from "@/app/data/campaign-lore/content-reveal-button";
+import EntityLinks, { type LinkableEntity } from "@/app/data/campaign-lore/entity-links";
 import {
   attachEntityTag,
   createEntityComment,
@@ -63,6 +64,10 @@ function ContentActions({
         <form action={editEntityContent} className="content-edit-form">
           <input type="hidden" name="contentId" value={id} />
           <input type="hidden" name="contentType" value={type} />
+          <small>
+            Exact, case-sensitive entity names become links when that entity is visible to the
+            reader.
+          </small>
           <label className="material-field">
             <span>Name</span>
             <input name="name" defaultValue={name} required maxLength={80} />
@@ -101,10 +106,12 @@ export default function EntityView({
   data,
   categories,
   currentUserId,
+  linkableEntities,
 }: {
   data: EntityData;
   categories: Category[];
   currentUserId: string;
+  linkableEntities: LinkableEntity[];
 }) {
   const attached = new Set(data.tags.map((tag) => tag.id));
   const isGm = data.campaign.user_id === currentUserId;
@@ -154,7 +161,13 @@ export default function EntityView({
         {data.images.map((item) => (
           <figure key={item.id}>
             <header className="content-card-header">
-              <h2>{item.name || "Image"}</h2>
+              <h2>
+                <EntityLinks
+                  text={item.name || "Image"}
+                  campaignId={data.campaign.id}
+                  entities={linkableEntities}
+                />
+              </h2>
               {isGm && (
                 <ContentActions
                   id={item.id}
@@ -185,7 +198,13 @@ export default function EntityView({
         {data.textboxes.map((box) => (
           <article key={box.id}>
             <header className="content-card-header">
-              <h2>{box.name || "Notes"}</h2>
+              <h2>
+                <EntityLinks
+                  text={box.name || "Notes"}
+                  campaignId={data.campaign.id}
+                  entities={linkableEntities}
+                />
+              </h2>
               {isGm && (
                 <ContentActions
                   id={box.id}
@@ -198,7 +217,13 @@ export default function EntityView({
                 />
               )}
             </header>
-            <p>{box.textbox_content}</p>
+            <p>
+              <EntityLinks
+                text={box.textbox_content}
+                campaignId={data.campaign.id}
+                entities={linkableEntities}
+              />
+            </p>
           </article>
         ))}
       </div>
