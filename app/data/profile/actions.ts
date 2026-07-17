@@ -4,14 +4,26 @@ import { z } from "zod";
 import { updateProfileUsername } from "@/app/dataloader";
 import { createSession, getSession } from "@/lib/session";
 
-export type ProfileState = { errors?: { username?: string[] }; message?: string; success?: boolean };
+export type ProfileState = {
+  errors?: { username?: string[] };
+  message?: string;
+  success?: boolean;
+};
 
 const usernameSchema = z.object({
-  username: z.string().trim().toLowerCase().min(3, "Username must be at least 3 characters.").max(32)
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3, "Username must be at least 3 characters.")
+    .max(32)
     .regex(/^[a-z0-9_]+$/, "Use only letters, numbers, and underscores."),
 });
 
-export async function updateUsername(_state: ProfileState, formData: FormData): Promise<ProfileState> {
+export async function updateUsername(
+  _state: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
   const session = await getSession();
   if (!session) return { message: "Your session has expired. Sign in again." };
   const parsed = usernameSchema.safeParse(Object.fromEntries(formData));

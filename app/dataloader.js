@@ -8,7 +8,9 @@ function getSupabaseConfig() {
   const url = firstEnvironmentValue("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
   const secretKey = firstEnvironmentValue("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !secretKey) {
-    throw new Error("Supabase server configuration is incomplete. Set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY).");
+    throw new Error(
+      "Supabase server configuration is incomplete. Set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY).",
+    );
   }
   return { url, secretKey };
 }
@@ -79,7 +81,11 @@ export async function loginUser(email, password) {
     password,
   });
   throwIfError(error, "Invalid email or password");
-  const profileResult = await database.from("profile").select("id, username, created_at").eq("id", data.user.id).maybeSingle();
+  const profileResult = await database
+    .from("profile")
+    .select("id, username, created_at")
+    .eq("id", data.user.id)
+    .maybeSingle();
   throwIfError(profileResult.error, "Could not load profile");
   const profile = profileResult.data;
   if (!profile) throw new Error("Could not load profile: profile does not exist");
@@ -107,10 +113,38 @@ export async function getUserById(userId) {
   return data;
 }
 
+export async function getUserPreferences(userId) {
+  const { data, error } = await getDatabase()
+    .from("profile")
+    .select("last_campaign_id, theme_setting")
+    .eq("id", userId)
+    .maybeSingle();
+  throwIfError(error, "Could not load user preferences");
+  return data ?? { last_campaign_id: null, theme_setting: "parchment" };
+}
+
+export async function updateThemeSetting(userId, theme) {
+  const { error } = await getDatabase()
+    .from("profile")
+    .update({ theme_setting: theme })
+    .eq("id", userId);
+  throwIfError(error, "Could not update theme");
+}
+
 export async function getCampaignsForUser(userId) {
-  const { data, error } = await getDatabase().rpc("get_accessible_campaigns", { requesting_user_id: userId });
+  const { data, error } = await getDatabase().rpc("get_accessible_campaigns", {
+    requesting_user_id: userId,
+  });
   throwIfError(error, "Could not load campaigns");
   return data ?? [];
+}
+
+export async function getCampaignDashboard(userId) {
+  const { data, error } = await getDatabase().rpc("get_campaign_dashboard", {
+    requesting_user_id: userId,
+  });
+  throwIfError(error, "Could not load campaign dashboard");
+  return data ?? { owned: [], joined: [] };
 }
 
 export async function createCampaign(ownerId, name) {
@@ -123,6 +157,25 @@ export async function createCampaign(ownerId, name) {
   return data;
 }
 
+export const renameCampaign = (userId, campaignId, name) =>
+  runEntityMutation(
+    "rename_campaign",
+    { requesting_user_id: userId, requested_campaign_id: campaignId, campaign_name: name },
+    "Could not rename campaign",
+  );
+export const addCampaignPlayer = (userId, campaignId, username) =>
+  runEntityMutation(
+    "add_campaign_player",
+    { requesting_user_id: userId, requested_campaign_id: campaignId, player_username: username },
+    "Could not add player",
+  );
+export const deleteCampaign = (userId, campaignId) =>
+  runEntityMutation(
+    "delete_campaign",
+    { requesting_user_id: userId, requested_campaign_id: campaignId },
+    "Could not delete campaign",
+  );
+
 export async function getCampaignLore(campaignId, userId) {
   const { data, error } = await getDatabase().rpc("get_campaign_lore", {
     requesting_user_id: userId,
@@ -133,40 +186,57 @@ export async function getCampaignLore(campaignId, userId) {
 }
 
 export async function getTagsForUser(userId) {
-  const { data, error } = await getDatabase().from("tag").select("id, name").eq("user_id", userId).order("name");
+  const { data, error } = await getDatabase()
+    .from("tag")
+    .select("id, name")
+    .eq("user_id", userId)
+    .order("name");
   throwIfError(error, "Could not load tags");
   return data ?? [];
 }
 
 export async function createTag(userId, name) {
-  const { data, error } = await getDatabase().from("tag").insert({ user_id: userId, name }).select("id, name").single();
+  const { data, error } = await getDatabase()
+    .from("tag")
+    .insert({ user_id: userId, name })
+    .select("id, name")
+    .single();
   throwIfError(error, "Could not create tag");
   return data;
 }
 
 export async function createCategory(userId, name, parentCategoryId) {
-  const { data, error } = await getDatabase().from("category").insert({
-    user_id: userId,
-    name,
-    parent_category_id: parentCategoryId || null,
-  }).select("id, name, parent_category_id").single();
+  const { data, error } = await getDatabase()
+    .from("category")
+    .insert({
+      user_id: userId,
+      name,
+      parent_category_id: parentCategoryId || null,
+    })
+    .select("id, name, parent_category_id")
+    .single();
   throwIfError(error, "Could not create category");
   return data;
 }
 
 export async function createLoreEntity(campaignId, userId, name, categoryId) {
-  const { data, error } = await getDatabase().rpc("create_lore_entity", {
-    requesting_user_id: userId,
-    requested_campaign_id: campaignId,
-    entity_name: name,
-    requested_category_id: categoryId || null,
-  }).single();
+  const { data, error } = await getDatabase()
+    .rpc("create_lore_entity", {
+      requesting_user_id: userId,
+      requested_campaign_id: campaignId,
+      entity_name: name,
+      requested_category_id: categoryId || null,
+    })
+    .single();
   throwIfError(error, "Could not create lore entity");
   return data;
 }
 
 export async function getEntityView(entityId, userId) {
-  const { data, error } = await getDatabase().rpc("get_entity_view", { requesting_user_id: userId, requested_entity_id: entityId });
+  const { data, error } = await getDatabase().rpc("get_entity_view", {
+    requesting_user_id: userId,
+    requested_entity_id: entityId,
+  });
   throwIfError(error, "Could not load entity");
   return data;
 }
@@ -176,8 +246,78 @@ async function runEntityMutation(name, values, context) {
   throwIfError(error, context);
 }
 
-export const updateEntityDetails = (userId, entityId, name, categoryId) => runEntityMutation("update_entity_details", { requesting_user_id: userId, requested_entity_id: entityId, entity_name: name, requested_category_id: categoryId || null }, "Could not update entity");
-export const addEntityTextbox = (userId, entityId, name, content) => runEntityMutation("add_entity_textbox", { requesting_user_id: userId, requested_entity_id: entityId, textbox_name: name, textbox_content: content }, "Could not add textbox");
-export const addEntityImage = (userId, entityId, name, url) => runEntityMutation("add_entity_image", { requesting_user_id: userId, requested_entity_id: entityId, image_name: name, requested_image_url: url }, "Could not add image");
-export const addEntityTag = (userId, entityId, tagId) => runEntityMutation("add_entity_tag", { requesting_user_id: userId, requested_entity_id: entityId, requested_tag_id: tagId }, "Could not add tag");
-export const addEntityComment = (userId, entityId, content) => runEntityMutation("add_entity_comment", { requesting_user_id: userId, requested_entity_id: entityId, comment_content: content }, "Could not add comment");
+export const updateEntityDetails = (userId, entityId, name, categoryId) =>
+  runEntityMutation(
+    "update_entity_details",
+    {
+      requesting_user_id: userId,
+      requested_entity_id: entityId,
+      entity_name: name,
+      requested_category_id: categoryId || null,
+    },
+    "Could not update entity",
+  );
+export const addEntityTextbox = (userId, entityId, name, content) =>
+  runEntityMutation(
+    "add_entity_textbox",
+    {
+      requesting_user_id: userId,
+      requested_entity_id: entityId,
+      textbox_name: name,
+      textbox_content: content,
+    },
+    "Could not add textbox",
+  );
+export const addEntityImage = (userId, entityId, name, url) =>
+  runEntityMutation(
+    "add_entity_image",
+    {
+      requesting_user_id: userId,
+      requested_entity_id: entityId,
+      image_name: name,
+      requested_image_url: url,
+    },
+    "Could not add image",
+  );
+export const addEntityTag = (userId, entityId, tagId) =>
+  runEntityMutation(
+    "add_entity_tag",
+    { requesting_user_id: userId, requested_entity_id: entityId, requested_tag_id: tagId },
+    "Could not add tag",
+  );
+export const addEntityComment = (userId, entityId, content) =>
+  runEntityMutation(
+    "add_entity_comment",
+    { requesting_user_id: userId, requested_entity_id: entityId, comment_content: content },
+    "Could not add comment",
+  );
+export const updateEntityContent = (userId, contentId, type, name, value) =>
+  runEntityMutation(
+    "update_entity_content",
+    {
+      requesting_user_id: userId,
+      requested_content_id: contentId,
+      content_type: type,
+      content_name: name,
+      content_value: value,
+    },
+    "Could not update content",
+  );
+export const setEntityContentReveal = (userId, contentId, type, revealToAll, profileIds) =>
+  runEntityMutation(
+    "set_entity_content_reveal",
+    {
+      requesting_user_id: userId,
+      requested_content_id: contentId,
+      content_type: type,
+      reveal_to_all: revealToAll,
+      revealed_profile_ids: profileIds,
+    },
+    "Could not change content reveal",
+  );
+export const deleteEntityContent = (userId, contentId, type) =>
+  runEntityMutation(
+    "delete_entity_content",
+    { requesting_user_id: userId, requested_content_id: contentId, content_type: type },
+    "Could not delete content",
+  );

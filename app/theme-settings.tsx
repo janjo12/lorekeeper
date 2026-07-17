@@ -1,6 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useTransition } from "react";
+import { saveTheme } from "@/app/data/actions";
+import { type ThemeId, useAccountTheme } from "@/app/theme-shell";
 
 const themes = [
   { id: "parchment", name: "Parchment", mode: "Light", colors: ["#efe5d1", "#fffaf0", "#75501f"] },
@@ -11,67 +13,63 @@ const themes = [
   { id: "ink", name: "Ink", mode: "Dark", colors: ["#151515", "#242424", "#d6c5a1"] },
 ] as const;
 
-type ThemeId = (typeof themes)[number]["id"];
-const themeEvent = "lorekeeper-theme-change";
-
-function isThemeId(value: string | null): value is ThemeId {
-  return themes.some((theme) => theme.id === value);
-}
-
-function getThemeSnapshot(): ThemeId {
-  const savedTheme = window.localStorage.getItem("lorekeeper-theme");
-  return isThemeId(savedTheme) ? savedTheme : "parchment";
-}
-
-function subscribeToTheme(onChange: () => void) {
-  window.addEventListener(themeEvent, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(themeEvent, onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
-
 export default function ThemeSettings() {
-  const theme = useTheme();
+  const { theme, setTheme } = useAccountTheme();
+  const [saving, startTransition] = useTransition();
 
   function selectTheme(nextTheme: ThemeId) {
-    window.localStorage.setItem("lorekeeper-theme", nextTheme);
-    window.dispatchEvent(new Event(themeEvent));
+    const previousTheme = theme;
+    setTheme(nextTheme);
+    startTransition(async () => {
+      try {
+        await saveTheme(nextTheme);
+      } catch {
+        setTheme(previousTheme);
+      }
+    });
   }
 
   return (
-    <fieldset className="theme-picker">
+    <fieldset className="theme-picker" disabled={saving}>
       <legend className="setting-label">Theme</legend>
-      <p className="setting-description">Choose how your lore workspace looks. Your choice is saved on this device.</p>
+      <p className="setting-description">
+        Choose how your lore workspace looks. Your choice follows your account across devices.
+      </p>
       <div className="theme-groups">
         {(["Light", "Dark"] as const).map((mode) => (
-          <section className="theme-group" key={mode} aria-labelledby={`${mode.toLowerCase()}-themes`}>
+          <section
+            className="theme-group"
+            key={mode}
+            aria-labelledby={`${mode.toLowerCase()}-themes`}
+          >
             <h3 id={`${mode.toLowerCase()}-themes`}>{mode} themes</h3>
             <div className="theme-options">
-              {themes.filter((option) => option.mode === mode).map((option) => (
-                <label className={`theme-option${theme === option.id ? " is-selected" : ""}`} key={option.id}>
-                  <input
-                    checked={theme === option.id}
-                    name="theme"
-                    onChange={() => selectTheme(option.id)}
-                    type="radio"
-                    value={option.id}
-                  />
-                  <span className="theme-swatches" aria-hidden="true">
-                    {option.colors.map((color) => <span key={color} style={{ background: color }} />)}
-                  </span>
-                  <span>{option.name}</span>
-                </label>
-              ))}
+              {themes
+                .filter((option) => option.mode === mode)
+                .map((option) => (
+                  <label
+                    className={`theme-option${theme === option.id ? " is-selected" : ""}`}
+                    key={option.id}
+                  >
+                    <input
+                      checked={theme === option.id}
+                      name="theme"
+                      onChange={() => selectTheme(option.id)}
+                      type="radio"
+                      value={option.id}
+                    />
+                    <span className="theme-swatches" aria-hidden="true">
+                      {option.colors.map((color) => (
+                        <span key={color} style={{ background: color }} />
+                      ))}
+                    </span>
+                    <span>{option.name}</span>
+                  </label>
+                ))}
             </div>
           </section>
         ))}
       </div>
     </fieldset>
   );
-}
-
-export function useTheme() {
-  return useSyncExternalStore(subscribeToTheme, getThemeSnapshot, () => "parchment");
 }

@@ -2,7 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { addEntityComment, addEntityImage, addEntityTag, addEntityTextbox, createCampaign, createCategory, createLoreEntity, createTag, updateEntityDetails } from "@/app/dataloader";
+import {
+  addCampaignPlayer,
+  addEntityComment,
+  addEntityImage,
+  addEntityTag,
+  addEntityTextbox,
+  createCampaign,
+  createCategory,
+  createLoreEntity,
+  createTag,
+  deleteCampaign,
+  deleteEntityContent,
+  renameCampaign,
+  setEntityContentReveal,
+  updateEntityContent,
+  updateEntityDetails,
+  updateThemeSetting,
+} from "@/app/dataloader";
 import { getSession } from "@/lib/session";
 
 export async function addCampaign(formData: FormData) {
@@ -14,6 +31,55 @@ export async function addCampaign(formData: FormData) {
 
   await createCampaign(session.userId, name.slice(0, 80));
   revalidatePath("/data/campaigns");
+}
+
+async function campaignAction(
+  formData: FormData,
+  operation: (userId: string, campaignId: string) => Promise<unknown>,
+) {
+  const session = await getSession();
+  if (!session) redirect("/auth/login");
+  const campaignId = formData.get("campaignId")?.toString();
+  if (!campaignId) return;
+  await operation(session.userId, campaignId);
+  revalidatePath("/data", "layout");
+}
+
+export async function editCampaign(formData: FormData) {
+  const name = formData.get("name")?.toString().trim().slice(0, 80);
+  if (!name) return;
+  return campaignAction(formData, (userId, campaignId) => renameCampaign(userId, campaignId, name));
+}
+
+export async function inviteCampaignPlayer(formData: FormData) {
+  const username = formData.get("username")?.toString().trim().toLowerCase().slice(0, 32);
+  if (!username) return;
+  return campaignAction(formData, (userId, campaignId) =>
+    addCampaignPlayer(userId, campaignId, username),
+  );
+}
+
+export type CampaignPlayerState = { message?: string; success?: boolean };
+
+export async function inviteCampaignPlayerWithState(
+  _state: CampaignPlayerState,
+  formData: FormData,
+): Promise<CampaignPlayerState> {
+  try {
+    await inviteCampaignPlayer(formData);
+    return { message: "Player added.", success: true };
+  } catch (error) {
+    const message =
+      error instanceof Error && /No user|GM cannot|Only the campaign GM/i.test(error.message)
+        ? error.message.replace(/^Could not add player:\s*/i, "")
+        : "Could not add that player. Check the username and try again.";
+    return { message, success: false };
+  }
+}
+
+export async function removeCampaign(formData: FormData) {
+  await campaignAction(formData, deleteCampaign);
+  redirect("/data/campaigns");
 }
 
 export async function addTag(formData: FormData) {
@@ -46,7 +112,10 @@ export async function addCategory(formData: FormData) {
   revalidatePath("/data/campaign-lore");
 }
 
-async function entityAction(formData: FormData, operation: (userId: string, entityId: string) => Promise<unknown>) {
+async function entityAction(
+  formData: FormData,
+  operation: (userId: string, entityId: string) => Promise<unknown>,
+) {
   const session = await getSession();
   if (!session) redirect("/auth/login");
   const entityId = formData.get("entityId")?.toString();
@@ -56,17 +125,94 @@ async function entityAction(formData: FormData, operation: (userId: string, enti
 }
 
 export async function editEntity(formData: FormData) {
-  return entityAction(formData, (userId, entityId) => updateEntityDetails(userId, entityId, formData.get("name")?.toString().trim().slice(0, 80) || "Untitled", formData.get("categoryId")?.toString()));
+  return entityAction(formData, (userId, entityId) =>
+    updateEntityDetails(
+      userId,
+      entityId,
+      formData.get("name")?.toString().trim().slice(0, 80) || "Untitled",
+      formData.get("categoryId")?.toString(),
+    ),
+  );
 }
 export async function createEntityTextbox(formData: FormData) {
-  return entityAction(formData, (userId, entityId) => addEntityTextbox(userId, entityId, formData.get("name")?.toString().trim().slice(0, 80) || "Notes", formData.get("content")?.toString().trim() || ""));
+  return entityAction(formData, (userId, entityId) =>
+    addEntityTextbox(
+      userId,
+      entityId,
+      formData.get("name")?.toString().trim().slice(0, 80) || "Notes",
+      formData.get("content")?.toString().trim() || "",
+    ),
+  );
 }
 export async function createEntityImage(formData: FormData) {
-  return entityAction(formData, (userId, entityId) => addEntityImage(userId, entityId, formData.get("name")?.toString().trim().slice(0, 80) || "Image", formData.get("url")?.toString().trim() || ""));
+  return entityAction(formData, (userId, entityId) =>
+    addEntityImage(
+      userId,
+      entityId,
+      formData.get("name")?.toString().trim().slice(0, 80) || "Image",
+      formData.get("url")?.toString().trim() || "",
+    ),
+  );
 }
 export async function attachEntityTag(formData: FormData) {
-  return entityAction(formData, (userId, entityId) => addEntityTag(userId, entityId, formData.get("tagId")?.toString() || ""));
+  return entityAction(formData, (userId, entityId) =>
+    addEntityTag(userId, entityId, formData.get("tagId")?.toString() || ""),
+  );
 }
 export async function createEntityComment(formData: FormData) {
-  return entityAction(formData, (userId, entityId) => addEntityComment(userId, entityId, formData.get("content")?.toString().trim() || ""));
+  return entityAction(formData, (userId, entityId) =>
+    addEntityComment(userId, entityId, formData.get("content")?.toString().trim() || ""),
+  );
+}
+
+async function contentAction(
+  formData: FormData,
+  operation: (userId: string, contentId: string, type: string) => Promise<unknown>,
+) {
+  const session = await getSession();
+  if (!session) redirect("/auth/login");
+  const contentId = formData.get("contentId")?.toString();
+  const type = formData.get("contentType")?.toString();
+  if (!contentId || !type || !["textbox", "image"].includes(type)) return;
+  await operation(session.userId, contentId, type);
+  revalidatePath("/data/campaign-lore");
+}
+
+export async function editEntityContent(formData: FormData) {
+  return contentAction(formData, (userId, contentId, type) =>
+    updateEntityContent(
+      userId,
+      contentId,
+      type,
+      formData.get("name")?.toString().trim().slice(0, 80) ||
+        (type === "image" ? "Image" : "Notes"),
+      formData.get("value")?.toString().trim() || "",
+    ),
+  );
+}
+
+export async function changeEntityContentReveal(formData: FormData) {
+  return contentAction(formData, (userId, contentId, type) =>
+    setEntityContentReveal(
+      userId,
+      contentId,
+      type,
+      formData.get("revealToAll") === "true",
+      formData.getAll("profileId").map(String),
+    ),
+  );
+}
+
+export async function removeEntityContent(formData: FormData) {
+  return contentAction(formData, deleteEntityContent);
+}
+
+const allowedThemes = new Set(["parchment", "ivory", "sage", "midnight", "ember", "ink"]);
+
+export async function saveTheme(theme: string) {
+  const session = await getSession();
+  if (!session) redirect("/auth/login");
+  if (!allowedThemes.has(theme)) throw new Error("Invalid theme selection.");
+  await updateThemeSetting(session.userId, theme);
+  revalidatePath("/data", "layout");
 }

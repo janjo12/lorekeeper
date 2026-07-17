@@ -11,6 +11,7 @@ function queryReturning(result) {
     eq: vi.fn(() => query),
     in: vi.fn(() => query),
     insert: vi.fn(() => query),
+    update: vi.fn(() => query),
     upsert: vi.fn(() => query),
     single: vi.fn(() => Promise.resolve(result)),
     maybeSingle: vi.fn(() => Promise.resolve(result)),
@@ -127,6 +128,60 @@ describe("dataloader", () => {
     await expect(getCampaignsForUser("user-1")).resolves.toEqual([owned, joined]);
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("get_accessible_campaigns", { requesting_user_id: "user-1" });
+  });
+
+  it("loads the GM and player campaign dashboard in one database call", async () => {
+    const dashboard = { owned: [{ id: "campaign-1", players: [] }], joined: [{ id: "campaign-2" }] };
+    const rpc = vi.fn().mockResolvedValue({ data: dashboard, error: null });
+    createClient.mockReturnValue({ rpc });
+    const { getCampaignDashboard } = await loadDataloader();
+
+    await expect(getCampaignDashboard("user-1")).resolves.toEqual(dashboard);
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("get_campaign_dashboard", { requesting_user_id: "user-1" });
+  });
+
+  it("adds a campaign player with one protected RPC call", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    createClient.mockReturnValue({ rpc });
+    const { addCampaignPlayer } = await loadDataloader();
+
+    await addCampaignPlayer("gm-1", "campaign-1", "player_name");
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("add_campaign_player", { requesting_user_id: "gm-1", requested_campaign_id: "campaign-1", player_username: "player_name" });
+  });
+
+  it("sets selected-player content reveals with one protected RPC call", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    createClient.mockReturnValue({ rpc });
+    const { setEntityContentReveal } = await loadDataloader();
+
+    await setEntityContentReveal("gm-1", "textbox-1", "textbox", false, ["player-1"]);
+
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("set_entity_content_reveal", {
+      requesting_user_id: "gm-1",
+      requested_content_id: "textbox-1",
+      content_type: "textbox",
+      reveal_to_all: false,
+      revealed_profile_ids: ["player-1"],
+    });
+  });
+
+  it("loads and updates account-scoped theme preferences", async () => {
+    const preferences = { last_campaign_id: "campaign-1", theme_setting: "midnight" };
+    const readQuery = queryReturning({ data: preferences, error: null });
+    const updateQuery = queryReturning({ data: null, error: null });
+    const database = { from: vi.fn().mockReturnValueOnce(readQuery).mockReturnValueOnce(updateQuery) };
+    createClient.mockReturnValue(database);
+    const { getUserPreferences, updateThemeSetting } = await loadDataloader();
+
+    await expect(getUserPreferences("user-1")).resolves.toEqual(preferences);
+    await updateThemeSetting("user-1", "ember");
+
+    expect(readQuery.select).toHaveBeenCalledWith("last_campaign_id, theme_setting");
+    expect(updateQuery.update).toHaveBeenCalledWith({ theme_setting: "ember" });
+    expect(updateQuery.eq).toHaveBeenCalledWith("id", "user-1");
   });
 
   it("surfaces database failures with their code and operation context", async () => {

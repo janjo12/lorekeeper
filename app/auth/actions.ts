@@ -6,7 +6,12 @@ import { loginUser, signupUser } from "@/app/dataloader";
 import { createSession, deleteSession } from "@/lib/session";
 
 export type AuthState = {
-  errors?: { email?: string[]; username?: string[]; password?: string[]; confirmPassword?: string[] };
+  errors?: {
+    email?: string[];
+    username?: string[];
+    password?: string[];
+    confirmPassword?: string[];
+  };
   message?: string;
 };
 
@@ -15,13 +20,21 @@ const loginSchema = z.object({
   email: z.email("Enter a valid email address.").trim().toLowerCase(),
   password: passwordSchema,
 });
-const signupSchema = loginSchema.extend({
-  username: z.string().trim().toLowerCase().min(3).max(32)
-    .regex(/^[a-z0-9_]+$/, "Use only letters, numbers, and underscores."),
-  confirmPassword: z.string(),
-}).refine((values) => values.password === values.confirmPassword, {
-  path: ["confirmPassword"], message: "Passwords do not match.",
-});
+const signupSchema = loginSchema
+  .extend({
+    username: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .min(3)
+      .max(32)
+      .regex(/^[a-z0-9_]+$/, "Use only letters, numbers, and underscores."),
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match.",
+  });
 
 export async function signup(_state: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
@@ -58,10 +71,14 @@ export async function logout() {
 
 function authErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) {
-    if (/email.*already|email_exists/i.test(error.message)) return "That email is already registered.";
-    if (/username|profile_username|duplicate|unique/i.test(error.message)) return "That username is already taken.";
-    if (/profile|schema cache|relation/i.test(error.message)) return "Database profile setup is incomplete. Apply the newest Supabase migration.";
-    if (/configuration|must be configured|environment/i.test(error.message)) return "Authentication is not configured for this deployment.";
+    if (/email.*already|email_exists/i.test(error.message))
+      return "That email is already registered.";
+    if (/username|profile_username|duplicate|unique/i.test(error.message))
+      return "That username is already taken.";
+    if (/profile|schema cache|relation/i.test(error.message))
+      return "Database profile setup is incomplete. Apply the newest Supabase migration.";
+    if (/configuration|must be configured|environment/i.test(error.message))
+      return "Authentication is not configured for this deployment.";
   }
   return fallback;
 }
