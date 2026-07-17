@@ -291,7 +291,12 @@ export const addEntityTextbox = (userId, entityId, name, content) =>
     "Could not add textbox",
   );
 export async function addEntityImage(userId, entityId, name, file) {
-  const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "img";
+  const extension =
+    file.name
+      .split(".")
+      .pop()
+      ?.toLowerCase()
+      .replace(/[^a-z0-9]/g, "") || "img";
   const storagePath = `${userId}/${entityId}/${crypto.randomUUID()}.${extension}`;
   const database = getDatabase();
   const { error: uploadError } = await database.storage
@@ -300,17 +305,17 @@ export async function addEntityImage(userId, entityId, name, file) {
   throwIfError(uploadError, "Could not upload image");
   try {
     await runEntityMutation(
-    "add_entity_image",
-    {
-      requesting_user_id: userId,
-      requested_entity_id: entityId,
-      image_name: name,
-      requested_storage_path: storagePath,
-      requested_mime_type: file.type,
-      requested_file_size: file.size,
-      requested_original_filename: file.name.slice(0, 255),
-    },
-    "Could not add image",
+      "add_entity_image",
+      {
+        requesting_user_id: userId,
+        requested_entity_id: entityId,
+        image_name: name,
+        requested_storage_path: storagePath,
+        requested_mime_type: file.type,
+        requested_file_size: file.size,
+        requested_original_filename: file.name.slice(0, 255),
+      },
+      "Could not add image",
     );
   } catch (error) {
     await database.storage.from("entity-images").remove([storagePath]);
@@ -361,7 +366,9 @@ export async function deleteEntityContent(userId, contentId, type) {
   });
   throwIfError(error, "Could not delete content");
   if (type === "image" && data) {
-    const { error: storageError } = await getDatabase().storage.from("entity-images").remove([data]);
+    const { error: storageError } = await getDatabase()
+      .storage.from("entity-images")
+      .remove([data]);
     throwIfError(storageError, "Image record was deleted, but its file could not be removed");
   }
 }

@@ -85,7 +85,12 @@ export default function EntityContentFab({ entityId }: { entityId: string }) {
               ) : (
                 <label className="material-field">
                   <span>Image file</span>
-                  <input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required />
+                  <input
+                    name="image"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    required
+                  />
                 </label>
               )}
               <div className="dialog-actions">

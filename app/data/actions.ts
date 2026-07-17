@@ -22,6 +22,9 @@ import {
 } from "@/app/dataloader";
 import { getSession } from "@/lib/session";
 
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
 export async function addCampaign(formData: FormData) {
   const session = await getSession();
   if (!session) redirect("/auth/login");
@@ -146,10 +149,9 @@ export async function createEntityTextbox(formData: FormData) {
 }
 export async function createEntityImage(formData: FormData) {
   const file = formData.get("image");
-  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
   if (!(file instanceof File) || file.size === 0) return;
-  if (file.size > 8 * 1024 * 1024) throw new Error("Images must be 8 MB or smaller.");
-  if (!allowedTypes.has(file.type)) throw new Error("Choose a JPEG, PNG, WebP, or GIF image.");
+  if (file.size > MAX_IMAGE_BYTES) throw new Error("Images must be 8 MB or smaller.");
+  if (!IMAGE_TYPES.has(file.type)) throw new Error("Choose a JPEG, PNG, WebP, or GIF image.");
   return entityAction(formData, (userId, entityId) =>
     addEntityImage(
       userId,

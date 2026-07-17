@@ -5,34 +5,15 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCampaignLore, getCampaignsForUser, getEntityView } from "@/app/dataloader";
 import { getSession } from "@/lib/session";
+import {
+  getRevealedEntities,
+  getVisibleCategories,
+  type LoreCategory,
+  type LoreEntity,
+  type RevealView,
+} from "@/app/data/campaign-lore/lore-visibility";
 
-type LoreCategory = { id: string; name: string; parent_category_id?: string | null };
-type LoreEntity = { id: string; name: string; category_id?: string | null };
 type AccessibleCampaign = { id: string; name: string; user_id: string };
-type RevealView = {
-  entity?: { id: string; campaign_id: string };
-  textboxes?: unknown[];
-  images?: unknown[];
-};
-
-function getVisibleCategories(categories: LoreCategory[], entities: LoreEntity[]) {
-  const categoryById = new Map(categories.map((category) => [category.id, category]));
-  const visibleIds = new Set(
-    entities.flatMap((entity) => (entity.category_id ? [entity.category_id] : [])),
-  );
-
-  for (const categoryId of [...visibleIds]) {
-    let parentId = categoryById.get(categoryId)?.parent_category_id;
-    const visited = new Set<string>();
-    while (parentId && !visited.has(parentId)) {
-      visited.add(parentId);
-      visibleIds.add(parentId);
-      parentId = categoryById.get(parentId)?.parent_category_id;
-    }
-  }
-
-  return categories.filter((category) => visibleIds.has(category.id));
-}
 
 export default async function CampaignLorePage({
   searchParams,
@@ -60,18 +41,10 @@ export default async function CampaignLorePage({
         getEntityView(entity.id, session.userId, { signImages: false }),
       ),
     )) as RevealView[];
-    const revealedEntityIds = new Set(
-      revealViews
-        .filter((view) => (view.textboxes?.length ?? 0) + (view.images?.length ?? 0) > 0)
-        .map((view) => view.entity?.id)
-        .filter((id): id is string => Boolean(id)),
-    );
-    visibleEntities = campaignEntities.filter((entity) => revealedEntityIds.has(entity.id));
+    visibleEntities = getRevealedEntities(campaignEntities, revealViews);
   }
 
-  const categories = isGm
-    ? allCategories
-    : getVisibleCategories(allCategories, visibleEntities);
+  const categories = isGm ? allCategories : getVisibleCategories(allCategories, visibleEntities);
   const selectedCategory = categories.some((category) => category.id === params.category)
     ? params.category
     : undefined;
@@ -80,9 +53,7 @@ export default async function CampaignLorePage({
     : visibleEntities;
   if (params.entity) {
     const mayViewEntity = visibleEntities.some((entity) => entity.id === params.entity);
-    const entityData = mayViewEntity
-      ? await getEntityView(params.entity, session.userId)
-      : null;
+    const entityData = mayViewEntity ? await getEntityView(params.entity, session.userId) : null;
     if (entityData?.entity?.campaign_id === campaignId)
       return (
         <EntityView

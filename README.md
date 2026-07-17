@@ -52,8 +52,8 @@ Vercel: https://lorekeeper-pied.vercel.app
 ├───────────────────────┤  ├───────────────────────┤
 │ PK  id                │  │ PK  id                │
 │ FK  entity_id         │  │ FK  entity_id         │
-|     name (optional)   |  |     name (optional)   |
-│     content           │  │     url               │
+|     name              |  |     name              |
+│     content           │  │     storage path      │
 └───────────────────────┘  └───────────────────────┘
           │                         │
           ▼                         ▼
@@ -64,7 +64,7 @@ Vercel: https://lorekeeper-pied.vercel.app
 │ PK, FK entity_textbox_id  │  │ PK, FK entity_image_id    │
 │ PK, FK profile_id         │  │ PK, FK profile_id         │
 └───────────────────────────┘  └───────────────────────────┘
-                  
+
 
 ┌───────────────────────┐
 │          tag          │
