@@ -140,3 +140,20 @@ export async function createLoreEntity(campaignId, userId, name, categoryId) {
   throwIfError(error, "Could not create lore entity");
   return data;
 }
+
+export async function getEntityView(entityId, userId) {
+  const { data, error } = await getDatabase().rpc("get_entity_view", { requesting_user_id: userId, requested_entity_id: entityId });
+  throwIfError(error, "Could not load entity");
+  return data;
+}
+
+async function runEntityMutation(name, values, context) {
+  const { error } = await getDatabase().rpc(name, values);
+  throwIfError(error, context);
+}
+
+export const updateEntityDetails = (userId, entityId, name, categoryId) => runEntityMutation("update_entity_details", { requesting_user_id: userId, requested_entity_id: entityId, entity_name: name, requested_category_id: categoryId || null }, "Could not update entity");
+export const addEntityTextbox = (userId, entityId, name, content) => runEntityMutation("add_entity_textbox", { requesting_user_id: userId, requested_entity_id: entityId, textbox_name: name, textbox_content: content }, "Could not add textbox");
+export const addEntityImage = (userId, entityId, name, url) => runEntityMutation("add_entity_image", { requesting_user_id: userId, requested_entity_id: entityId, image_name: name, requested_image_url: url }, "Could not add image");
+export const addEntityTag = (userId, entityId, tagId) => runEntityMutation("add_entity_tag", { requesting_user_id: userId, requested_entity_id: entityId, requested_tag_id: tagId }, "Could not add tag");
+export const addEntityComment = (userId, entityId, content) => runEntityMutation("add_entity_comment", { requesting_user_id: userId, requested_entity_id: entityId, comment_content: content }, "Could not add comment");
