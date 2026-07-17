@@ -34,18 +34,17 @@ describe("dataloader", () => {
   it("signs up a user and returns the profile created for that auth identity", async () => {
     const profile = { id: "user-1", username: "keeper", created_at: "2026-07-16" };
     const database = {
-      auth: { admin: { createUser: vi.fn().mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }) } },
-      from: vi.fn(() => queryReturning({ data: profile, error: null })),
+      auth: { admin: { createUser: vi.fn().mockResolvedValue({ data: { user: { id: "user-1", created_at: "2026-07-16" } }, error: null }) } },
     };
     createClient.mockReturnValue(database);
     const { signupUser } = await loadDataloader();
 
-    await expect(signupUser("keeper", "long-password")).resolves.toEqual(profile);
+    await expect(signupUser("keeper@example.com", "keeper", "long-password")).resolves.toEqual(profile);
     expect(database.auth.admin.createUser).toHaveBeenCalledWith(expect.objectContaining({
-      phone: expect.stringMatching(/^\+1\d{10}$/),
-      phone_confirm: true,
+      email: "keeper@example.com",
+      email_confirm: true,
+      user_metadata: { username: "keeper" },
     }));
-    expect(database.auth.admin.createUser.mock.calls[0][0]).not.toHaveProperty("email");
   });
 
   it("logs in valid credentials and returns the matching public profile", async () => {
@@ -57,29 +56,24 @@ describe("dataloader", () => {
     createClient.mockReturnValueOnce(database).mockReturnValueOnce(authClient);
     const { loginUser } = await loadDataloader();
 
-    await expect(loginUser("scribe", "long-password")).resolves.toEqual(profile);
+    await expect(loginUser("scribe@example.com", "long-password")).resolves.toEqual(profile);
     expect(authClient.auth.signInWithPassword).toHaveBeenCalledWith({
-      phone: expect.stringMatching(/^\+1\d{10}$/),
+      email: "scribe@example.com",
       password: "long-password",
     });
   });
 
-  it("repairs a missing profile when signup is retried for the same credentials", async () => {
-    const profile = { id: "user-1", username: "keeper", created_at: "2026-07-16" };
+  it("surfaces a duplicate email instead of replacing its profile", async () => {
     const database = {
       auth: { admin: { createUser: vi.fn().mockResolvedValue({
         data: { user: null },
-        error: { message: "already registered", code: "phone_exists" },
+        error: { message: "already registered", code: "email_exists" },
       }) } },
-      from: vi.fn(() => queryReturning({ data: profile, error: null })),
     };
-    const authClient = {
-      auth: { signInWithPassword: vi.fn().mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }) },
-    };
-    createClient.mockReturnValueOnce(database).mockReturnValueOnce(authClient);
+    createClient.mockReturnValue(database);
     const { signupUser } = await loadDataloader();
 
-    await expect(signupUser("keeper", "long-password")).resolves.toEqual(profile);
+    await expect(signupUser("keeper@example.com", "keeper", "long-password")).rejects.toMatchObject({ code: "email_exists" });
   });
 
   it("returns null when a profile does not exist", async () => {
@@ -89,18 +83,16 @@ describe("dataloader", () => {
     await expect(getUserById("missing-user")).resolves.toBeNull();
   });
 
-  it("combines owned and joined campaigns without duplicates", async () => {
+  it("loads owned and joined campaigns in one database call", async () => {
     const owned = { id: "campaign-1", name: "Owned", user_id: "user-1" };
     const joined = { id: "campaign-2", name: "Joined", user_id: "user-2" };
-    const results = [
-      { data: [owned], error: null },
-      { data: [{ campaign_id: "campaign-1" }, { campaign_id: "campaign-2" }], error: null },
-      { data: [owned, joined], error: null },
-    ];
-    createClient.mockReturnValue({ from: vi.fn(() => queryReturning(results.shift())) });
+    const rpc = vi.fn().mockResolvedValue({ data: [owned, joined], error: null });
+    createClient.mockReturnValue({ rpc });
     const { getCampaignsForUser } = await loadDataloader();
 
     await expect(getCampaignsForUser("user-1")).resolves.toEqual([owned, joined]);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("get_accessible_campaigns", { requesting_user_id: "user-1" });
   });
 
   it("surfaces database failures with their code and operation context", async () => {

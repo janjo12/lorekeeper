@@ -7,6 +7,7 @@ const SESSION_LENGTH_SECONDS = 60 * 60 * 24 * 7;
 
 export type Session = {
   userId: string;
+  email: string;
   username: string;
 };
 
@@ -20,7 +21,7 @@ function sessionKey() {
 
 export async function createSession(session: Session) {
   const expiresAt = new Date(Date.now() + SESSION_LENGTH_SECONDS * 1000);
-  const token = await new SignJWT({ username: session.username })
+  const token = await new SignJWT({ email: session.email, username: session.username })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(session.userId)
     .setIssuedAt()
@@ -44,8 +45,8 @@ export async function getSession(): Promise<Session | null> {
     const { payload } = await jwtVerify(token, sessionKey(), {
       algorithms: ["HS256"],
     });
-    if (!payload.sub || typeof payload.username !== "string") return null;
-    return { userId: payload.sub, username: payload.username };
+    if (!payload.sub || typeof payload.email !== "string" || typeof payload.username !== "string") return null;
+    return { userId: payload.sub, email: payload.email, username: payload.username };
   } catch {
     return null;
   }

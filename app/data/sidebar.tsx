@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 
 const navigationItems = [
   { label: "Campaigns", href: "/data/campaigns" },
-  { label: "Campaign Lore", href: "/data/campaign-lore" },
   { label: "My Tags", href: "/data/tags" },
   { label: "Settings", href: "/data/settings" },
 ];
 
-export default function Sidebar({ username }: { username: string }) {
+export default function Sidebar({ username, firstCampaignId }: { username: string; firstCampaignId?: string }) {
   const pathname = usePathname();
 
   return (
@@ -25,6 +24,16 @@ export default function Sidebar({ username }: { username: string }) {
             <span className="nav-icon" aria-hidden="true" />
             <span className="nav-label"><span>Profile</span><small>{username}</small></span>
         </Link>
+        {firstCampaignId && (
+          <Link
+            className={`sidebar-link${pathname === "/data/campaign-lore" ? " is-active" : ""}`}
+            href={`/data/campaign-lore?campaign=${firstCampaignId}`}
+            aria-current={pathname === "/data/campaign-lore" ? "page" : undefined}
+          >
+            <span className="nav-icon" aria-hidden="true" />
+            <span>Campaign Lore</span>
+          </Link>
+        )}
         {navigationItems.map((item) => (
           <Link
             className={`sidebar-link${pathname === item.href ? " is-active" : ""}`}

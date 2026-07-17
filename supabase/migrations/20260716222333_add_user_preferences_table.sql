@@ -1,15 +1,6 @@
-drop table if exists public.profile cascade;
-
-create table public.profile (
-    user_id uuid primary key
-        references auth.users(id) on delete cascade,
-
-    username text not null unique,
-
-    last_campaign_id bigint
-        references public.campaign(id) on delete set null,
-
-    theme_setting text not null default 'light'
-);
-
-alter table public.profile enable row level security;
+-- Extend the Auth-linked profile created by the previous migration. Recreating
+-- it here would remove its policies and break the auth.users profile trigger.
+alter table public.profile
+  add column if not exists last_campaign_id uuid
+    references public.campaign(id) on delete set null,
+  add column if not exists theme_setting text not null default 'parchment';

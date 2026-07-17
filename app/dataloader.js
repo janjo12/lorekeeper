@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 let client;
@@ -27,24 +26,6 @@ function throwIfError(error, context) {
   throw databaseError;
 }
 
-function authPhone(username) {
-  const digits = createHash("sha256")
-    .update(`lorekeeper:${username}`)
-    .digest()
-    .subarray(0, 8)
-    .reduce((value, byte) => (value * 256n) + BigInt(byte), 0n)
-    .toString()
-    .padStart(20, "0")
-    .slice(-10);
-  return `+1${digits}`;
-}
-
-function isExistingAuthIdentity(error) {
-  return error?.code === "phone_exists"
-    || error?.code === "user_already_exists"
-    || /already registered|already exists/i.test(error?.message ?? "");
-}
-
 function createAuthClient() {
   const { url, secretKey } = getSupabaseConfig();
   return createClient(url, secretKey, {
@@ -52,51 +33,41 @@ function createAuthClient() {
   });
 }
 
-async function ensureProfile(database, userId, username) {
-  const { data, error } = await database
-    .from("profile")
-    .upsert({ id: userId, username }, { onConflict: "id" })
-    .select("id, username, created_at")
-    .single();
-  throwIfError(error, "Could not create or load profile");
-  return data;
-}
-
-export async function signupUser(username, password) {
+export async function signupUser(email, username, password) {
   const database = getDatabase();
-  const phone = authPhone(username);
   const { data, error } = await database.auth.admin.createUser({
-    phone,
+    email,
     password,
-    phone_confirm: true,
+    email_confirm: true,
     user_metadata: { username },
   });
-
-  let user = data?.user;
-  if (isExistingAuthIdentity(error)) {
-    const existing = await createAuthClient().auth.signInWithPassword({
-      phone,
-      password,
-    });
-    if (existing.error) throwIfError(error, "Could not create user");
-    user = existing.data.user;
-  } else {
-    throwIfError(error, "Could not create user");
-  }
-
-  return ensureProfile(database, user.id, username);
+  throwIfError(error, "Could not create user");
+  return { id: data.user.id, username, created_at: data.user.created_at };
 }
 
-export async function loginUser(username, password) {
-  const phone = authPhone(username);
+export async function loginUser(email, password) {
   const database = getDatabase();
   const { data, error } = await createAuthClient().auth.signInWithPassword({
-    phone,
+    email,
     password,
   });
   throwIfError(error, "Invalid email or password");
+  const profileResult = await database.from("profile").select("id, username, created_at").eq("id", data.user.id).maybeSingle();
+  throwIfError(profileResult.error, "Could not load profile");
+  const profile = profileResult.data;
+  if (!profile) throw new Error("Could not load profile: profile does not exist");
+  return profile;
+}
 
-  return ensureProfile(database, data.user.id, username);
+export async function updateProfileUsername(userId, username) {
+  const { data, error } = await getDatabase()
+    .from("profile")
+    .update({ username })
+    .eq("id", userId)
+    .select("id, username, created_at")
+    .single();
+  throwIfError(error, "Could not update username");
+  return data;
 }
 
 export async function getUserById(userId) {
@@ -110,24 +81,9 @@ export async function getUserById(userId) {
 }
 
 export async function getCampaignsForUser(userId) {
-  const database = getDatabase();
-  const [ownedResult, membershipsResult] = await Promise.all([
-    database.from("campaign").select("id, name, user_id").eq("user_id", userId),
-    database.from("campaign_player").select("campaign_id").eq("user_id", userId),
-  ]);
-  throwIfError(ownedResult.error, "Could not load owned campaigns");
-  throwIfError(membershipsResult.error, "Could not load campaign memberships");
-
-  const joinedIds = (membershipsResult.data ?? []).map(({ campaign_id }) => campaign_id);
-  let joined = [];
-  if (joinedIds.length) {
-    const result = await database.from("campaign").select("id, name, user_id").in("id", joinedIds);
-    throwIfError(result.error, "Could not load joined campaigns");
-    joined = result.data ?? [];
-  }
-
-  const campaigns = [...(ownedResult.data ?? []), ...joined];
-  return [...new Map(campaigns.map((campaign) => [campaign.id, campaign])).values()];
+  const { data, error } = await getDatabase().rpc("get_accessible_campaigns", { requesting_user_id: userId });
+  throwIfError(error, "Could not load campaigns");
+  return data ?? [];
 }
 
 export async function createCampaign(ownerId, name) {
@@ -137,5 +93,47 @@ export async function createCampaign(ownerId, name) {
     .select("id, name, user_id")
     .single();
   throwIfError(error, "Could not create campaign");
+  return data;
+}
+
+export async function getCampaignLore(campaignId, userId) {
+  const { data, error } = await getDatabase().rpc("get_campaign_lore", {
+    requesting_user_id: userId,
+    requested_campaign_id: campaignId,
+  });
+  throwIfError(error, "Could not load campaign lore");
+  return data;
+}
+
+export async function getTagsForUser(userId) {
+  const { data, error } = await getDatabase().from("tag").select("id, name").eq("user_id", userId).order("name");
+  throwIfError(error, "Could not load tags");
+  return data ?? [];
+}
+
+export async function createTag(userId, name) {
+  const { data, error } = await getDatabase().from("tag").insert({ user_id: userId, name }).select("id, name").single();
+  throwIfError(error, "Could not create tag");
+  return data;
+}
+
+export async function createCategory(userId, name, parentCategoryId) {
+  const { data, error } = await getDatabase().from("category").insert({
+    user_id: userId,
+    name,
+    parent_category_id: parentCategoryId || null,
+  }).select("id, name, parent_category_id").single();
+  throwIfError(error, "Could not create category");
+  return data;
+}
+
+export async function createLoreEntity(campaignId, userId, name, categoryId) {
+  const { data, error } = await getDatabase().rpc("create_lore_entity", {
+    requesting_user_id: userId,
+    requested_campaign_id: campaignId,
+    entity_name: name,
+    requested_category_id: categoryId || null,
+  }).single();
+  throwIfError(error, "Could not create lore entity");
   return data;
 }

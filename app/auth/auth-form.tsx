@@ -15,10 +15,17 @@ export function AuthForm({ mode, action }: Props) {
 
   return (
     <form action={formAction} className="auth-form">
+      {signingUp && (
+        <div className="field">
+          <label htmlFor="username">Username</label>
+          <input id="username" name="username" autoComplete="username" required autoFocus />
+          {state.errors?.username?.map((error) => <p className="field-error" key={error}>{error}</p>)}
+        </div>
+      )}
       <div className="field">
-        <label htmlFor="username">Username</label>
-        <input id="username" name="username" autoComplete="username" required autoFocus />
-        {state.errors?.username?.map((error) => <p className="field-error" key={error}>{error}</p>)}
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" type="email" autoComplete="email" required autoFocus={!signingUp} />
+        {state.errors?.email?.map((error) => <p className="field-error" key={error}>{error}</p>)}
       </div>
       <div className="field">
         <label htmlFor="password">Password</label>
