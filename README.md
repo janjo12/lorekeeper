@@ -58,7 +58,7 @@ Vercel: https://lorekeeper-pied.vercel.app
           ▼                         ▼\
 \
 ┌───────────────────────────┐  ┌───────────────────────────┐\
-│    textbox_knowledge      │  │     image_knowledge       │\
+│    textbox_revealed       │  │     image_revealed        │\
 ├───────────────────────────┤  ├───────────────────────────┤\
 │ PK, FK entity_textbox_id  │  │ PK, FK entity_image_id    │\
 │ PK, FK profile_id         │  │ PK, FK profile_id         │\

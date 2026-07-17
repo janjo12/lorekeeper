@@ -83,6 +83,21 @@ describe("dataloader", () => {
     await expect(getUserById("missing-user")).resolves.toBeNull();
   });
 
+  it("recreates the database client when server credentials change", async () => {
+    const firstDatabase = { from: vi.fn(() => queryReturning({ data: null, error: null })) };
+    const secondDatabase = { from: vi.fn(() => queryReturning({ data: null, error: null })) };
+    createClient.mockReturnValueOnce(firstDatabase).mockReturnValueOnce(secondDatabase);
+    const { getUserById } = await loadDataloader();
+
+    await getUserById("first-user");
+    process.env.SUPABASE_SECRET_KEY = "rotated-secret-key";
+    await getUserById("second-user");
+
+    expect(createClient).toHaveBeenCalledTimes(2);
+    expect(firstDatabase.from).toHaveBeenCalledTimes(1);
+    expect(secondDatabase.from).toHaveBeenCalledTimes(1);
+  });
+
   it("loads owned and joined campaigns in one database call", async () => {
     const owned = { id: "campaign-1", name: "Owned", user_id: "user-1" };
     const joined = { id: "campaign-2", name: "Joined", user_id: "user-2" };

@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 let client;
+let clientConfigKey;
 
 function getSupabaseConfig() {
   const url = process.env.SUPABASE_URL;
@@ -11,11 +12,13 @@ function getSupabaseConfig() {
 }
 
 function getDatabase() {
-  if (client) return client;
   const { url, secretKey } = getSupabaseConfig();
+  const configKey = `${url}\u0000${secretKey}`;
+  if (client && clientConfigKey === configKey) return client;
   client = createClient(url, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+  clientConfigKey = configKey;
   return client;
 }
 
