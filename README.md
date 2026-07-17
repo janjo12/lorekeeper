@@ -9,8 +9,7 @@ Vercel: https://lorekeeper-pied.vercel.app
 ![New User Screen Wireframe](/assets/new-user-screen-wireframe.png)
 
 #### Lore Screen:
-![Lore Screen Wireframe](/assets/lore-screen-wireframe
-.png)
+![Lore Screen Wireframe](/assets/lore-screen-wireframe.png)
 
 # Database Schema:
 ┌───────────────────────────────────┐
