@@ -1,14 +1,4 @@
-# Local setup
-
-1. Put `SUPABASE_URL` and the server-only `SUPABASE_SECRET_KEY` in `.env`.
-2. Apply every file in `supabase/migrations` in filename order. The migrations
-   use Supabase Auth's `auth.users` table and automatically create `public.profile` rows.
-3. Set a random `SESSION_SECRET` of at least 32 characters in `.env.local`.
-4. Run `npm run dev`, then create an account at `/signup`.
-
-`app/dataloader.js` is the application's database interface. Server actions and
-Server Components should call its exported functions instead of constructing
-Supabase queries directly.
+Vercel: https://lorekeeper-pied.vercel.app
 
 # Wireframes:
 
