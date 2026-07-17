@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import EntityContentFab from "@/app/data/campaign-lore/entity-content-fab";
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
 import ContentRevealButton from "@/app/data/campaign-lore/content-reveal-button";
@@ -27,7 +26,11 @@ type EntityData = {
   images: Array<{
     id: string;
     name?: string;
-    image_url: string;
+    storage_path: string;
+    signed_url?: string;
+    mime_type: string;
+    file_size: number;
+    original_filename: string;
     revealed_to_all: boolean;
     revealed_profile_ids: string[];
   }>;
@@ -64,14 +67,12 @@ function ContentActions({
             <span>Name</span>
             <input name="name" defaultValue={name} required maxLength={80} />
           </label>
-          <label className="material-field">
-            <span>{type === "image" ? "Image URL" : "Content"}</span>
-            {type === "image" ? (
-              <input name="value" defaultValue={value} type="url" required />
-            ) : (
+          {type !== "image" && (
+            <label className="material-field">
+              <span>Content</span>
               <textarea name="value" defaultValue={value} rows={6} required />
-            )}
-          </label>
+            </label>
+          )}
           <div className="dialog-actions">
             <button className="filled-action">Save</button>
           </div>
@@ -159,20 +160,24 @@ export default function EntityView({
                   id={item.id}
                   type="image"
                   name={item.name || "Image"}
-                  value={item.image_url}
+                  value=""
                   players={data.campaign_players}
                   revealedToAll={item.revealed_to_all}
                   revealedProfileIds={item.revealed_profile_ids}
                 />
               )}
             </header>
-            <Image
-              src={item.image_url}
-              alt={item.name || data.entity.name}
-              width={800}
-              height={450}
-              unoptimized
-            />
+            {item.signed_url && (
+              // Signed Storage URLs expire, so bypassing Next's persistent image
+              // optimizer cache keeps the private URL lifecycle predictable.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.signed_url}
+                alt={item.name || data.entity.name}
+                width={800}
+                height={450}
+              />
+            )}
           </figure>
         ))}
       </div>

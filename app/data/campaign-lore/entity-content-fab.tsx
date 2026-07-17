@@ -59,7 +59,7 @@ export default function EntityContentFab({ entityId }: { entityId: string }) {
             <p>
               {mode === "textbox"
                 ? "Add written lore to this entity."
-                : "Add an image using a public image URL."}
+                : "Upload an image. Files are private and shown through temporary links."}
             </p>
             <form
               action={async (data) => {
@@ -80,8 +80,8 @@ export default function EntityContentFab({ entityId }: { entityId: string }) {
                 </label>
               ) : (
                 <label className="material-field">
-                  <span>Image URL</span>
-                  <input name="url" type="url" required />
+                  <span>Image file</span>
+                  <input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required />
                 </label>
               )}
               <div className="dialog-actions">

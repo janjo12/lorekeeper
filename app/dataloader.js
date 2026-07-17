@@ -238,7 +238,19 @@ export async function getEntityView(entityId, userId) {
     requested_entity_id: entityId,
   });
   throwIfError(error, "Could not load entity");
-  return data;
+  if (!data?.images?.length) return data;
+  const paths = data.images.map((image) => image.storage_path);
+  const { data: signedImages, error: signedImagesError } = await getDatabase()
+    .storage.from("entity-images")
+    .createSignedUrls(paths, 60 * 10);
+  throwIfError(signedImagesError, "Could not create image links");
+  return {
+    ...data,
+    images: data.images.map((image, index) => ({
+      ...image,
+      signed_url: signedImages[index]?.signedUrl,
+    })),
+  };
 }
 
 async function runEntityMutation(name, values, context) {
@@ -268,17 +280,33 @@ export const addEntityTextbox = (userId, entityId, name, content) =>
     },
     "Could not add textbox",
   );
-export const addEntityImage = (userId, entityId, name, url) =>
-  runEntityMutation(
+export async function addEntityImage(userId, entityId, name, file) {
+  const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "img";
+  const storagePath = `${userId}/${entityId}/${crypto.randomUUID()}.${extension}`;
+  const database = getDatabase();
+  const { error: uploadError } = await database.storage
+    .from("entity-images")
+    .upload(storagePath, file, { contentType: file.type, upsert: false });
+  throwIfError(uploadError, "Could not upload image");
+  try {
+    await runEntityMutation(
     "add_entity_image",
     {
       requesting_user_id: userId,
       requested_entity_id: entityId,
       image_name: name,
-      requested_image_url: url,
+      requested_storage_path: storagePath,
+      requested_mime_type: file.type,
+      requested_file_size: file.size,
+      requested_original_filename: file.name.slice(0, 255),
     },
     "Could not add image",
-  );
+    );
+  } catch (error) {
+    await database.storage.from("entity-images").remove([storagePath]);
+    throw error;
+  }
+}
 export const addEntityTag = (userId, entityId, tagId) =>
   runEntityMutation(
     "add_entity_tag",
@@ -315,9 +343,15 @@ export const setEntityContentReveal = (userId, contentId, type, revealToAll, pro
     },
     "Could not change content reveal",
   );
-export const deleteEntityContent = (userId, contentId, type) =>
-  runEntityMutation(
-    "delete_entity_content",
-    { requesting_user_id: userId, requested_content_id: contentId, content_type: type },
-    "Could not delete content",
-  );
+export async function deleteEntityContent(userId, contentId, type) {
+  const { data, error } = await getDatabase().rpc("delete_entity_content", {
+    requesting_user_id: userId,
+    requested_content_id: contentId,
+    content_type: type,
+  });
+  throwIfError(error, "Could not delete content");
+  if (type === "image" && data) {
+    const { error: storageError } = await getDatabase().storage.from("entity-images").remove([data]);
+    throwIfError(storageError, "Image record was deleted, but its file could not be removed");
+  }
+}

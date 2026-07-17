@@ -145,12 +145,17 @@ export async function createEntityTextbox(formData: FormData) {
   );
 }
 export async function createEntityImage(formData: FormData) {
+  const file = formData.get("image");
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+  if (!(file instanceof File) || file.size === 0) return;
+  if (file.size > 8 * 1024 * 1024) throw new Error("Images must be 8 MB or smaller.");
+  if (!allowedTypes.has(file.type)) throw new Error("Choose a JPEG, PNG, WebP, or GIF image.");
   return entityAction(formData, (userId, entityId) =>
     addEntityImage(
       userId,
       entityId,
       formData.get("name")?.toString().trim().slice(0, 80) || "Image",
-      formData.get("url")?.toString().trim() || "",
+      file,
     ),
   );
 }
@@ -186,7 +191,7 @@ export async function editEntityContent(formData: FormData) {
       type,
       formData.get("name")?.toString().trim().slice(0, 80) ||
         (type === "image" ? "Image" : "Notes"),
-      formData.get("value")?.toString().trim() || "",
+      type === "image" ? "" : formData.get("value")?.toString().trim() || "",
     ),
   );
 }
