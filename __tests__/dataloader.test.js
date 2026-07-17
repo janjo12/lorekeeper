@@ -29,6 +29,10 @@ describe("dataloader", () => {
     createClient.mockReset();
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SECRET_KEY = "test-secret-key";
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   });
 
   it("signs up a user and returns the profile created for that auth identity", async () => {
@@ -61,6 +65,21 @@ describe("dataloader", () => {
       email: "scribe@example.com",
       password: "long-password",
     });
+  });
+
+  it("uses a publishable key for password authentication when one is configured", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
+    const profile = { id: "user-2", username: "scribe", created_at: "2026-07-16" };
+    const database = { from: vi.fn(() => queryReturning({ data: profile, error: null })) };
+    const authClient = {
+      auth: { signInWithPassword: vi.fn().mockResolvedValue({ data: { user: { id: "user-2" } }, error: null }) },
+    };
+    createClient.mockReturnValueOnce(database).mockReturnValueOnce(authClient);
+    const { loginUser } = await loadDataloader();
+
+    await loginUser("scribe@example.com", "long-password");
+
+    expect(createClient).toHaveBeenNthCalledWith(2, "https://example.supabase.co", "publishable-key", expect.any(Object));
   });
 
   it("surfaces a duplicate email instead of replacing its profile", async () => {

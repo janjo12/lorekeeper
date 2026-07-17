@@ -5,10 +5,34 @@ let client;
 let clientConfigKey;
 
 function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !secretKey) throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY must be configured.");
+  const url = firstEnvironmentValue("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
+  const secretKey = firstEnvironmentValue("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !secretKey) {
+    throw new Error("Supabase server configuration is incomplete. Set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY).");
+  }
   return { url, secretKey };
+}
+
+function firstEnvironmentValue(...names) {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getAuthConfig() {
+  const { url } = getSupabaseConfig();
+  const publicKey = firstEnvironmentValue(
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_ANON_KEY",
+  );
+
+  // A separate publishable key is preferred for user authentication. Falling
+  // back keeps existing deployments working while credentials are migrated.
+  return { url, publicKey: publicKey ?? getSupabaseConfig().secretKey };
 }
 
 function getDatabase() {
@@ -30,8 +54,8 @@ function throwIfError(error, context) {
 }
 
 function createAuthClient() {
-  const { url, secretKey } = getSupabaseConfig();
-  return createClient(url, secretKey, {
+  const { url, publicKey } = getAuthConfig();
+  return createClient(url, publicKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

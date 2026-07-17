@@ -12,7 +12,7 @@ export type Session = {
 };
 
 function sessionKey() {
-  const secret = process.env.SESSION_SECRET;
+  const secret = process.env.SESSION_SECRET?.trim();
   if (!secret || secret.length < 32) {
     throw new Error("SESSION_SECRET must be at least 32 characters.");
   }
@@ -33,7 +33,9 @@ export async function createSession(session: Session) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    maxAge: SESSION_LENGTH_SECONDS,
     expires: expiresAt,
+    priority: "high",
   });
 }
 
@@ -44,6 +46,7 @@ export async function getSession(): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, sessionKey(), {
       algorithms: ["HS256"],
+      clockTolerance: 5,
     });
     if (!payload.sub || typeof payload.email !== "string" || typeof payload.username !== "string") return null;
     return { userId: payload.sub, email: payload.email, username: payload.username };
