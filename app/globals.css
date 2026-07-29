@@ -852,6 +852,58 @@ input {
   font-size: 0.85rem;
   text-decoration: none;
 }
+.category-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.category-row .category-link {
+  flex: 1;
+}
+.category-actions > summary {
+  padding: 0.4rem;
+  cursor: pointer;
+  list-style: none;
+}
+.category-actions-panel {
+  position: absolute;
+  z-index: 20;
+  left: 1rem;
+  display: grid;
+  gap: 1rem;
+  width: min(24rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 18%);
+}
+.category-actions-panel form,
+.category-actions-panel fieldset {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+.category-actions-panel fieldset {
+  padding: 0;
+  border: 0;
+}
+.category-actions-panel label {
+  font-family: Arial, sans-serif;
+  font-size: 0.82rem;
+}
+.danger-note {
+  margin: 0;
+  color: var(--danger, #a32929);
+  font:
+    0.78rem/1.4 Arial,
+    sans-serif;
+}
+.entity-header-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
 .category-link:hover,
 .category-link.is-active {
   background: var(--accent-soft);

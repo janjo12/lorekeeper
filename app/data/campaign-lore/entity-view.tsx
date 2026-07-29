@@ -8,6 +8,7 @@ import {
   createEntityComment,
   editEntity,
   editEntityContent,
+  removeEntity,
   removeEntityContent,
 } from "@/app/data/actions";
 
@@ -133,28 +134,40 @@ export default function EntityView({
           </div>
         </div>
         {isGm && (
-          <details className="edit-details">
-            <summary className="secondary-button">Edit entity</summary>
-            <form action={editEntity} className="edit-entity-form">
+          <div className="entity-header-actions">
+            <details className="edit-details">
+              <summary className="secondary-button">Edit entity</summary>
+              <form action={editEntity} className="edit-entity-form">
+                <input type="hidden" name="entityId" value={data.entity.id} />
+                <label className="material-field">
+                  <span>Name</span>
+                  <input name="name" defaultValue={data.entity.name} required />
+                </label>
+                <label className="material-field">
+                  <span>Category</span>
+                  <select name="categoryId" defaultValue={data.entity.category_id || ""}>
+                    <option value="">No category</option>
+                    {categories.map((category) => (
+                      <option value={category.id} key={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="filled-action">Save</button>
+              </form>
+            </details>
+            <form action={removeEntity}>
               <input type="hidden" name="entityId" value={data.entity.id} />
-              <label className="material-field">
-                <span>Name</span>
-                <input name="name" defaultValue={data.entity.name} required />
-              </label>
-              <label className="material-field">
-                <span>Category</span>
-                <select name="categoryId" defaultValue={data.entity.category_id || ""}>
-                  <option value="">No category</option>
-                  {categories.map((category) => (
-                    <option value={category.id} key={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="filled-action">Save</button>
+              <input type="hidden" name="campaignId" value={data.campaign.id} />
+              <ConfirmDeleteButton
+                className="secondary-button is-danger"
+                warningMessage={`Are you sure you want to delete the entity “${data.entity.name}”? All textboxes and images associated with it will be deleted with it. This cannot be undone.`}
+              >
+                Delete entity
+              </ConfirmDeleteButton>
             </form>
-          </details>
+          </div>
         )}
       </header>
       <div className="entity-images">

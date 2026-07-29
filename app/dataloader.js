@@ -279,6 +279,65 @@ export const updateEntityDetails = (userId, entityId, name, categoryId) =>
     },
     "Could not update entity",
   );
+
+async function getOwnedCategory(userId, categoryId) {
+  const { data, error } = await getDatabase()
+    .from("category")
+    .select("id, parent_category_id")
+    .eq("id", categoryId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  throwIfError(error, "Could not load category");
+  if (!data) throw new Error("Could not load category: category does not exist");
+  return data;
+}
+
+async function assertOwnedDestinationCategory(userId, categoryId) {
+  if (!categoryId) return null;
+  return getOwnedCategory(userId, categoryId);
+}
+
+export async function moveEntity(userId, entityId, categoryId) {
+  await assertOwnedDestinationCategory(userId, categoryId);
+  const { data: entity, error: entityError } = await getDatabase()
+    .from("entity")
+    .select("id, campaign!inner(user_id)")
+    .eq("id", entityId)
+    .eq("campaign.user_id", userId)
+    .maybeSingle();
+  throwIfError(entityError, "Could not load entity");
+  if (!entity) throw new Error("Could not move entity: entity does not exist");
+
+  const { error } = await getDatabase()
+    .from("entity")
+    .update({ category_id: categoryId || null })
+    .eq("id", entityId);
+  throwIfError(error, "Could not move entity");
+}
+
+export async function moveCategory(userId, categoryId, parentCategoryId) {
+  await getOwnedCategory(userId, categoryId);
+  await assertOwnedDestinationCategory(userId, parentCategoryId);
+  if (categoryId === parentCategoryId) {
+    throw new Error("Could not move category: a category cannot contain itself");
+  }
+
+  let ancestorId = parentCategoryId || null;
+  while (ancestorId) {
+    if (ancestorId === categoryId) {
+      throw new Error("Could not move category: a category cannot move inside its descendant");
+    }
+    const ancestor = await getOwnedCategory(userId, ancestorId);
+    ancestorId = ancestor.parent_category_id;
+  }
+
+  const { error } = await getDatabase()
+    .from("category")
+    .update({ parent_category_id: parentCategoryId || null })
+    .eq("id", categoryId)
+    .eq("user_id", userId);
+  throwIfError(error, "Could not move category");
+}
 export const addEntityTextbox = (userId, entityId, name, content) =>
   runEntityMutation(
     "add_entity_textbox",
@@ -371,4 +430,66 @@ export async function deleteEntityContent(userId, contentId, type) {
       .remove([data]);
     throwIfError(storageError, "Image record was deleted, but its file could not be removed");
   }
+}
+
+export const deleteTextbox = (userId, textboxId) =>
+  deleteEntityContent(userId, textboxId, "textbox");
+
+export const deleteImage = (userId, imageId) => deleteEntityContent(userId, imageId, "image");
+
+export async function deleteEntity(userId, entityId) {
+  const { data: entity, error: entityError } = await getDatabase()
+    .from("entity")
+    .select("id, campaign!inner(user_id)")
+    .eq("id", entityId)
+    .eq("campaign.user_id", userId)
+    .maybeSingle();
+  throwIfError(entityError, "Could not load entity");
+  if (!entity) throw new Error("Could not delete entity: entity does not exist");
+
+  const [textboxesResult, imagesResult] = await Promise.all([
+    getDatabase().from("entity_textbox").select("id").eq("entity_id", entityId),
+    getDatabase().from("entity_image").select("id").eq("entity_id", entityId),
+  ]);
+  throwIfError(textboxesResult.error, "Could not load entity textboxes");
+  throwIfError(imagesResult.error, "Could not load entity images");
+
+  for (const textbox of textboxesResult.data ?? []) await deleteTextbox(userId, textbox.id);
+  for (const image of imagesResult.data ?? []) await deleteImage(userId, image.id);
+
+  const { error } = await getDatabase().from("entity").delete().eq("id", entityId);
+  throwIfError(error, "Could not delete entity");
+}
+
+export async function deleteCategory(userId, categoryId, deleteContents = false) {
+  const category = await getOwnedCategory(userId, categoryId);
+  const [entitiesResult, childrenResult] = await Promise.all([
+    getDatabase().from("entity").select("id").eq("category_id", categoryId),
+    getDatabase()
+      .from("category")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("parent_category_id", categoryId),
+  ]);
+  throwIfError(entitiesResult.error, "Could not load category entities");
+  throwIfError(childrenResult.error, "Could not load subcategories");
+
+  if (deleteContents) {
+    for (const child of childrenResult.data ?? []) await deleteCategory(userId, child.id, true);
+    for (const entity of entitiesResult.data ?? []) await deleteEntity(userId, entity.id);
+  } else {
+    for (const entity of entitiesResult.data ?? []) {
+      await moveEntity(userId, entity.id, category.parent_category_id);
+    }
+    for (const child of childrenResult.data ?? []) {
+      await moveCategory(userId, child.id, category.parent_category_id);
+    }
+  }
+
+  const { error } = await getDatabase()
+    .from("category")
+    .delete()
+    .eq("id", categoryId)
+    .eq("user_id", userId);
+  throwIfError(error, "Could not delete category");
 }

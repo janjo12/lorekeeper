@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 type ConfirmDeleteButtonProps = {
   className?: string;
   itemName?: string;
+  warningMessage?: string;
   children?: React.ReactNode;
 };
 
@@ -12,6 +13,7 @@ type ConfirmDeleteButtonProps = {
 export default function ConfirmDeleteButton({
   className,
   itemName = "this item",
+  warningMessage,
   children = "Delete",
 }: ConfirmDeleteButtonProps) {
   const { pending } = useFormStatus();
@@ -22,7 +24,9 @@ export default function ConfirmDeleteButton({
       disabled={pending}
       onClick={(event) => {
         if (
-          !window.confirm(`Are you sure you want to delete ${itemName}? This cannot be undone.`)
+          !window.confirm(
+            warningMessage ?? `Are you sure you want to delete ${itemName}? This cannot be undone.`,
+          )
         ) {
           event.preventDefault();
         }

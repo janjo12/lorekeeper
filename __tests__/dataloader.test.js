@@ -11,6 +11,7 @@ function queryReturning(result) {
     eq: vi.fn(() => query),
     in: vi.fn(() => query),
     insert: vi.fn(() => query),
+    delete: vi.fn(() => query),
     update: vi.fn(() => query),
     upsert: vi.fn(() => query),
     order: vi.fn(() => query),
@@ -309,6 +310,71 @@ describe("dataloader", () => {
       reveal_to_all: false,
       revealed_profile_ids: ["player-1"],
     });
+  });
+
+  it("moves an owned entity to another owned category", async () => {
+    const destinationQuery = queryReturning({
+      data: { id: "category-2", parent_category_id: null },
+      error: null,
+    });
+    const entityQuery = queryReturning({
+      data: { id: "entity-1", campaign: { user_id: "gm-1" } },
+      error: null,
+    });
+    const updateQuery = queryReturning({ data: null, error: null });
+    const database = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(destinationQuery)
+        .mockReturnValueOnce(entityQuery)
+        .mockReturnValueOnce(updateQuery),
+    };
+    createClient.mockReturnValue(database);
+    const { moveEntity } = await loadDataloader();
+
+    await moveEntity("gm-1", "entity-1", "category-2");
+
+    expect(updateQuery.update).toHaveBeenCalledWith({ category_id: "category-2" });
+    expect(updateQuery.eq).toHaveBeenCalledWith("id", "entity-1");
+  });
+
+  it("moves a category to the top level", async () => {
+    const sourceQuery = queryReturning({
+      data: { id: "category-1", parent_category_id: "old-parent" },
+      error: null,
+    });
+    const updateQuery = queryReturning({ data: null, error: null });
+    createClient.mockReturnValue({
+      from: vi.fn().mockReturnValueOnce(sourceQuery).mockReturnValueOnce(updateQuery),
+    });
+    const { moveCategory } = await loadDataloader();
+
+    await moveCategory("gm-1", "category-1", null);
+
+    expect(updateQuery.update).toHaveBeenCalledWith({ parent_category_id: null });
+  });
+
+  it("exposes entity content deletion as explicit textbox and image operations", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: "gm/entity/image.png", error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    createClient.mockReturnValue({
+      rpc,
+      storage: { from: vi.fn(() => ({ remove })) },
+    });
+    const { deleteImage, deleteTextbox } = await loadDataloader();
+
+    await deleteTextbox("gm-1", "textbox-1");
+    await deleteImage("gm-1", "image-1");
+
+    expect(rpc).toHaveBeenNthCalledWith(1, "delete_entity_content", {
+      requesting_user_id: "gm-1",
+      requested_content_id: "textbox-1",
+      content_type: "textbox",
+    });
+    expect(remove).toHaveBeenCalledWith(["gm/entity/image.png"]);
   });
 
   it("loads and updates account-scoped theme preferences", async () => {

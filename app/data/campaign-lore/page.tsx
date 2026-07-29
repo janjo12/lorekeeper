@@ -71,6 +71,7 @@ export default async function CampaignLorePage({
         campaignId={campaignId}
         categories={categories}
         selectedCategory={selectedCategory}
+        isGm={isGm}
       />
       <section className="data-panel lore-entities" id="all-lore">
         <p className="eyebrow">Archive</p>

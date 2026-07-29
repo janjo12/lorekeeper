@@ -12,8 +12,12 @@ import {
   createCategory,
   createLoreEntity,
   createTag,
+  deleteCategory,
   deleteCampaign,
+  deleteEntity,
   deleteEntityContent,
+  moveCategory,
+  moveEntity,
   renameCampaign,
   setEntityContentReveal,
   updateEntityContent,
@@ -128,14 +132,44 @@ async function entityAction(
 }
 
 export async function editEntity(formData: FormData) {
-  return entityAction(formData, (userId, entityId) =>
-    updateEntityDetails(
+  return entityAction(formData, async (userId, entityId) => {
+    const categoryId = formData.get("categoryId")?.toString();
+    await updateEntityDetails(
       userId,
       entityId,
       formData.get("name")?.toString().trim().slice(0, 80) || "Untitled",
-      formData.get("categoryId")?.toString(),
-    ),
+      categoryId,
+    );
+    await moveEntity(userId, entityId, categoryId);
+  });
+}
+
+export async function removeEntity(formData: FormData) {
+  const campaignId = formData.get("campaignId")?.toString();
+  await entityAction(formData, deleteEntity);
+  redirect(
+    campaignId
+      ? `/data/campaign-lore?campaign=${encodeURIComponent(campaignId)}`
+      : "/data/campaign-lore",
   );
+}
+
+export async function changeCategoryParent(formData: FormData) {
+  const session = await getSession();
+  if (!session) redirect("/auth/login");
+  const categoryId = formData.get("categoryId")?.toString();
+  if (!categoryId) return;
+  await moveCategory(session.userId, categoryId, formData.get("parentCategoryId")?.toString());
+  revalidatePath("/data/campaign-lore");
+}
+
+export async function removeCategory(formData: FormData) {
+  const session = await getSession();
+  if (!session) redirect("/auth/login");
+  const categoryId = formData.get("categoryId")?.toString();
+  if (!categoryId) return;
+  await deleteCategory(session.userId, categoryId, formData.get("deleteContents") === "true");
+  revalidatePath("/data/campaign-lore");
 }
 export async function createEntityTextbox(formData: FormData) {
   return entityAction(formData, (userId, entityId) =>
