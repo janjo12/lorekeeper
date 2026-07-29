@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const navigationItems = [
   { label: "Campaigns", href: "/data/campaigns", icon: "campaigns" },
@@ -52,12 +53,33 @@ export default function Sidebar({
   firstCampaignId?: string;
 }) {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <aside className="lore-sidebar">
+    <aside className={`lore-sidebar${mobileMenuOpen ? " is-mobile-open" : ""}`}>
+      <div className="mobile-nav-bar">
+        <button
+          className="mobile-menu-button"
+          type="button"
+          aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-controls="main-navigation"
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        >
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+        </button>
+        <span className="mobile-wordmark">Lorekeeper</span>
+      </div>
       <div className="lore-sidebar-inner">
         <span className="wordmark">Lorekeeper</span>
-        <nav className="sidebar-nav" aria-label="Main navigation">
+        <nav
+          className="sidebar-nav"
+          aria-label="Main navigation"
+          id="main-navigation"
+          onClick={() => setMobileMenuOpen(false)}
+        >
           <Link
             className={`sidebar-link${pathname === "/data/profile" ? " is-active" : ""}`}
             href="/data/profile"

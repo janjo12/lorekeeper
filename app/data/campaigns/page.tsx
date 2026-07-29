@@ -23,7 +23,7 @@ export default async function CampaignsPage() {
           <h1>Campaigns</h1>
           <p>Manage worlds you run and revisit campaigns you have joined.</p>
         </div>
-        <form action={addCampaign} className="inline-create-form">
+        <form action={addCampaign} className="inline-create-form campaign-create-form">
           <label className="sr-only" htmlFor="campaign-name">
             Campaign name
           </label>
