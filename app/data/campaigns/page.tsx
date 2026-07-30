@@ -24,7 +24,7 @@ export default async function CampaignsPage() {
         actions={
           <ActionForm
             action={addCampaign}
-            className="inline-create-form campaign-create-form"
+            className="inline-create-form compact-inline-form campaign-create-form"
             errorMessage="We couldn’t create that campaign. Check the name and try again."
           >
             <label className="sr-only" htmlFor="campaign-name">

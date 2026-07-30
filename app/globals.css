@@ -677,21 +677,24 @@ input {
   background: var(--surface);
   color: var(--shell-text);
 }
-.campaign-create-form {
-  --campaign-control-height: 2.25rem;
-  --campaign-input-max-width: 18rem;
-  --campaign-button-max-width: 12rem;
-  display: flex;
+.compact-inline-form {
+  --inline-control-height: 2.25rem;
   align-items: center;
-  align-self: flex-end;
   min-height: 0;
   height: auto;
 }
-.campaign-create-form input,
-.campaign-create-form .primary-button {
+.compact-inline-form input,
+.compact-inline-form select,
+.compact-inline-form .primary-button,
+.compact-inline-form .secondary-button {
   min-height: 0;
-  height: var(--campaign-control-height);
+  height: var(--inline-control-height);
   padding-block: 0;
+}
+.campaign-create-form {
+  --campaign-input-max-width: 18rem;
+  --campaign-button-max-width: 12rem;
+  align-self: flex-end;
 }
 .campaign-create-form input {
   flex-basis: 13rem;

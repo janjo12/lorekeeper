@@ -1,5 +1,5 @@
 import SideCategories from "@/app/data/campaign-lore/side-categories";
-import CreateFab from "@/app/data/campaign-lore/create-fab";
+import { CampaignCreationControls } from "@/app/data/campaign-lore/creation-controls";
 import EntityView from "@/app/data/campaign-lore/entity-view";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -61,6 +61,7 @@ export default async function CampaignLorePage({
           data={entityData}
           categories={categories}
           currentUserId={session.userId}
+          isGm={isGm}
           linkableEntities={visibleEntities.filter((entity) => entity.id !== entityData.entity.id)}
         />
       );
@@ -98,10 +99,16 @@ export default async function CampaignLorePage({
           </div>
         ) : (
           <EmptyState title="No lore entries yet">
-            Create an entity or choose another category.
+            {isGm
+              ? "Create an entity or choose another category."
+              : "No lore has been revealed here yet. Choose another category."}
           </EmptyState>
         )}
-        <CreateFab campaignId={campaignId} categories={categories} />
+        <CampaignCreationControls
+          isGm={isGm}
+          campaignId={campaignId}
+          categories={categories}
+        />
       </section>
     </div>
   );

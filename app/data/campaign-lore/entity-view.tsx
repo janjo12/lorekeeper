@@ -1,5 +1,5 @@
 import Link from "next/link";
-import EntityContentFab from "@/app/data/campaign-lore/entity-content-fab";
+import { EntityCreationControls } from "@/app/data/campaign-lore/creation-controls";
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
 import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 import { FormField } from "@/app/components/ui";
@@ -120,15 +120,16 @@ export default function EntityView({
   data,
   categories,
   currentUserId,
+  isGm,
   linkableEntities,
 }: {
   data: EntityData;
   categories: Category[];
   currentUserId: string;
+  isGm: boolean;
   linkableEntities: LinkableEntity[];
 }) {
   const attached = new Set(data.tags.map((tag) => tag.id));
-  const isGm = data.campaign.user_id === currentUserId;
   return (
     <section className="entity-view">
       <Link className="back-link" href={`/data/campaign-lore?campaign=${data.campaign.id}`}>
@@ -287,7 +288,11 @@ export default function EntityView({
       {!data.images.length && !data.textboxes.length && (
         <div className="empty-state">
           <h2>No content yet</h2>
-          <p>Use the create button to add an image or textbox.</p>
+          <p>
+            {isGm
+              ? "Use the create button to add an image or textbox."
+              : "No content has been revealed for this entity yet."}
+          </p>
         </div>
       )}
       <section className="entity-meta">
@@ -295,7 +300,7 @@ export default function EntityView({
           <h2>Tags</h2>
           <ActionForm
             action={attachEntityTag}
-            className="inline-create-form"
+            className="inline-create-form compact-inline-form"
             errorMessage="We couldn’t add that tag. Please try again."
           >
             <input type="hidden" name="entityId" value={data.entity.id} />
@@ -337,7 +342,7 @@ export default function EntityView({
           </div>
         </div>
       </section>
-      {isGm && <EntityContentFab entityId={data.entity.id} />}
+      <EntityCreationControls isGm={isGm} entityId={data.entity.id} />
     </section>
   );
 }
