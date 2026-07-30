@@ -1,6 +1,8 @@
 import Link from "next/link";
 import EntityContentFab from "@/app/data/campaign-lore/entity-content-fab";
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
+import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
+import { FormField } from "@/app/components/ui";
 import ContentRevealButton from "@/app/data/campaign-lore/content-reveal-button";
 import EntityLinks, { type LinkableEntity } from "@/app/data/campaign-lore/entity-links";
 import {
@@ -49,6 +51,7 @@ function ContentActions({
   players,
   revealedToAll,
   revealedProfileIds,
+  currentUserId,
 }: {
   id: string;
   type: "textbox" | "image";
@@ -57,32 +60,37 @@ function ContentActions({
   players: Player[];
   revealedToAll: boolean;
   revealedProfileIds: string[];
+  currentUserId: string;
 }) {
   return (
     <div className="content-actions">
       <details className="content-edit">
         <summary>Edit</summary>
-        <form action={editEntityContent} className="content-edit-form">
+        <ActionForm
+          action={editEntityContent}
+          className="content-edit-form"
+          errorMessage="We couldn’t save this content. Check the details and try again."
+        >
           <input type="hidden" name="contentId" value={id} />
           <input type="hidden" name="contentType" value={type} />
           <small>
             Exact, case-sensitive entity names become links when that entity is visible to the
             reader.
           </small>
-          <label className="material-field">
-            <span>Name</span>
+          <FormField label="Name" variant="material">
             <input name="name" defaultValue={name} required maxLength={80} />
-          </label>
+          </FormField>
           {type !== "image" && (
-            <label className="material-field">
-              <span>Content</span>
+            <FormField label="Content" variant="material">
               <textarea name="value" defaultValue={value} rows={6} required />
-            </label>
+            </FormField>
           )}
           <div className="dialog-actions">
-            <button className="filled-action">Save</button>
+            <SubmitButton variant="filled" pendingLabel="Saving…">
+              Save
+            </SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </details>
       <ContentRevealButton
         contentId={id}
@@ -90,15 +98,20 @@ function ContentActions({
         players={players}
         revealedToAll={revealedToAll}
         revealedProfileIds={revealedProfileIds}
+        canChangeReveal
+        currentUserId={currentUserId}
       />
-      <form action={removeEntityContent}>
+      <ActionForm
+        action={removeEntityContent}
+        errorMessage={`We couldn’t delete this ${type}. Please try again.`}
+      >
         <input type="hidden" name="contentId" value={id} />
         <input type="hidden" name="contentType" value={type} />
         <ConfirmDeleteButton
           className="content-action is-danger"
           itemName={type === "image" ? `the image “${name}”` : `the textbox “${name}”`}
         />
-      </form>
+      </ActionForm>
     </div>
   );
 }
@@ -137,14 +150,16 @@ export default function EntityView({
           <div className="entity-header-actions">
             <details className="edit-details">
               <summary className="secondary-button">Edit entity</summary>
-              <form action={editEntity} className="edit-entity-form">
+              <ActionForm
+                action={editEntity}
+                className="edit-entity-form"
+                errorMessage="We couldn’t update this entity. Check the details and try again."
+              >
                 <input type="hidden" name="entityId" value={data.entity.id} />
-                <label className="material-field">
-                  <span>Name</span>
+                <FormField label="Name" variant="material">
                   <input name="name" defaultValue={data.entity.name} required />
-                </label>
-                <label className="material-field">
-                  <span>Category</span>
+                </FormField>
+                <FormField label="Category" variant="material">
                   <select name="categoryId" defaultValue={data.entity.category_id || ""}>
                     <option value="">No category</option>
                     {categories.map((category) => (
@@ -153,11 +168,16 @@ export default function EntityView({
                       </option>
                     ))}
                   </select>
-                </label>
-                <button className="filled-action">Save</button>
-              </form>
+                </FormField>
+                <SubmitButton variant="filled" pendingLabel="Saving…">
+                  Save
+                </SubmitButton>
+              </ActionForm>
             </details>
-            <form action={removeEntity}>
+            <ActionForm
+              action={removeEntity}
+              errorMessage="We couldn’t delete this entity. Please try again."
+            >
               <input type="hidden" name="entityId" value={data.entity.id} />
               <input type="hidden" name="campaignId" value={data.campaign.id} />
               <ConfirmDeleteButton
@@ -166,7 +186,7 @@ export default function EntityView({
               >
                 Delete entity
               </ConfirmDeleteButton>
-            </form>
+            </ActionForm>
           </div>
         )}
       </header>
@@ -190,6 +210,18 @@ export default function EntityView({
                   players={data.campaign_players}
                   revealedToAll={item.revealed_to_all}
                   revealedProfileIds={item.revealed_profile_ids}
+                  currentUserId={currentUserId}
+                />
+              )}
+              {!isGm && !item.revealed_to_all && (
+                <ContentRevealButton
+                  contentId={item.id}
+                  contentType="image"
+                  players={data.campaign_players}
+                  revealedToAll={item.revealed_to_all}
+                  revealedProfileIds={item.revealed_profile_ids}
+                  canChangeReveal={false}
+                  currentUserId={currentUserId}
                 />
               )}
             </header>
@@ -227,6 +259,18 @@ export default function EntityView({
                   players={data.campaign_players}
                   revealedToAll={box.revealed_to_all}
                   revealedProfileIds={box.revealed_profile_ids}
+                  currentUserId={currentUserId}
+                />
+              )}
+              {!isGm && !box.revealed_to_all && (
+                <ContentRevealButton
+                  contentId={box.id}
+                  contentType="textbox"
+                  players={data.campaign_players}
+                  revealedToAll={box.revealed_to_all}
+                  revealedProfileIds={box.revealed_profile_ids}
+                  canChangeReveal={false}
+                  currentUserId={currentUserId}
                 />
               )}
             </header>
@@ -249,7 +293,11 @@ export default function EntityView({
       <section className="entity-meta">
         <div>
           <h2>Tags</h2>
-          <form action={attachEntityTag} className="inline-create-form">
+          <ActionForm
+            action={attachEntityTag}
+            className="inline-create-form"
+            errorMessage="We couldn’t add that tag. Please try again."
+          >
             <input type="hidden" name="entityId" value={data.entity.id} />
             <select name="tagId" required>
               <option value="">Choose a tag</option>
@@ -261,16 +309,24 @@ export default function EntityView({
                   </option>
                 ))}
             </select>
-            <button className="secondary-button">Add tag</button>
-          </form>
+            <SubmitButton variant="secondary" pendingLabel="Adding…">
+              Add tag
+            </SubmitButton>
+          </ActionForm>
         </div>
         <div>
           <h2>Comments</h2>
-          <form action={createEntityComment} className="comment-form">
+          <ActionForm
+            action={createEntityComment}
+            className="comment-form"
+            errorMessage="We couldn’t post that comment. Please try again."
+          >
             <input type="hidden" name="entityId" value={data.entity.id} />
             <textarea name="content" placeholder="Add a comment" required rows={3} />
-            <button className="filled-action">Comment</button>
-          </form>
+            <SubmitButton variant="filled" pendingLabel="Posting…">
+              Comment
+            </SubmitButton>
+          </ActionForm>
           <div className="comments">
             {data.comments.map((comment) => (
               <article key={comment.id}>

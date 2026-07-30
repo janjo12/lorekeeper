@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import Sidebar from "@/app/data/sidebar";
 import ThemeShell from "@/app/theme-shell";
 import { getCampaignsForUser, getUserPreferences } from "@/app/dataloader";
+import NotificationCenter from "@/app/data/notifications/notification-center";
 
 export default async function DataLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -14,6 +15,7 @@ export default async function DataLayout({ children }: { children: React.ReactNo
 
   return (
     <ThemeShell initialTheme={preferences.theme_setting} userId={session.userId}>
+      <NotificationCenter userId={session.userId} />
       <Sidebar username={session.username} firstCampaignId={campaigns[0]?.id} />
       <div className="lore-content">{children}</div>
     </ThemeShell>

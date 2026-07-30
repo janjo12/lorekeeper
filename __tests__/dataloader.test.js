@@ -40,6 +40,17 @@ describe("dataloader", () => {
 
   it("signs up a user and returns the profile created for that auth identity", async () => {
     const profile = { id: "user-1", username: "keeper", created_at: "2026-07-16" };
+    const authClient = {
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: {
+            user: { id: "user-1" },
+            session: { access_token: "access-1", refresh_token: "refresh-1" },
+          },
+          error: null,
+        }),
+      },
+    };
     const database = {
       auth: {
         admin: {
@@ -50,12 +61,14 @@ describe("dataloader", () => {
         },
       },
     };
-    createClient.mockReturnValue(database);
+    createClient.mockReturnValueOnce(database).mockReturnValueOnce(authClient);
     const { signupUser } = await loadDataloader();
 
-    await expect(signupUser("keeper@example.com", "keeper", "long-password")).resolves.toEqual(
-      profile,
-    );
+    await expect(signupUser("keeper@example.com", "keeper", "long-password")).resolves.toEqual({
+      ...profile,
+      accessToken: "access-1",
+      refreshToken: "refresh-1",
+    });
     expect(database.auth.admin.createUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "keeper@example.com",
@@ -70,15 +83,23 @@ describe("dataloader", () => {
     const database = { from: vi.fn(() => queryReturning({ data: profile, error: null })) };
     const authClient = {
       auth: {
-        signInWithPassword: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-2" } }, error: null }),
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: {
+            user: { id: "user-2" },
+            session: { access_token: "access-2", refresh_token: "refresh-2" },
+          },
+          error: null,
+        }),
       },
     };
     createClient.mockReturnValueOnce(database).mockReturnValueOnce(authClient);
     const { loginUser } = await loadDataloader();
 
-    await expect(loginUser("scribe@example.com", "long-password")).resolves.toEqual(profile);
+    await expect(loginUser("scribe@example.com", "long-password")).resolves.toEqual({
+      ...profile,
+      accessToken: "access-2",
+      refreshToken: "refresh-2",
+    });
     expect(authClient.auth.signInWithPassword).toHaveBeenCalledWith({
       email: "scribe@example.com",
       password: "long-password",
@@ -91,9 +112,13 @@ describe("dataloader", () => {
     const database = { from: vi.fn(() => queryReturning({ data: profile, error: null })) };
     const authClient = {
       auth: {
-        signInWithPassword: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-2" } }, error: null }),
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: {
+            user: { id: "user-2" },
+            session: { access_token: "access-2", refresh_token: "refresh-2" },
+          },
+          error: null,
+        }),
       },
     };
     createClient.mockReturnValueOnce(database).mockReturnValueOnce(authClient);
@@ -107,6 +132,30 @@ describe("dataloader", () => {
       "publishable-key",
       expect.any(Object),
     );
+  });
+
+  it("refreshes the Supabase session used by Realtime", async () => {
+    const authClient = {
+      auth: {
+        setSession: vi.fn().mockResolvedValue({
+          data: {
+            session: { access_token: "new-access", refresh_token: "new-refresh" },
+          },
+          error: null,
+        }),
+      },
+    };
+    createClient.mockReturnValue(authClient);
+    const { refreshAuthSession } = await loadDataloader();
+
+    await expect(refreshAuthSession("old-access", "old-refresh")).resolves.toEqual({
+      accessToken: "new-access",
+      refreshToken: "new-refresh",
+    });
+    expect(authClient.auth.setSession).toHaveBeenCalledWith({
+      access_token: "old-access",
+      refresh_token: "old-refresh",
+    });
   });
 
   it("surfaces a duplicate email instead of replacing its profile", async () => {
@@ -281,18 +330,31 @@ describe("dataloader", () => {
     expect(remove).toHaveBeenCalledWith([upload.mock.calls[0][0]]);
   });
 
-  it("adds a campaign player with one protected RPC call", async () => {
+  it("creates and resolves campaign invitations with protected RPC calls", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
     createClient.mockReturnValue({ rpc });
-    const { addCampaignPlayer } = await loadDataloader();
+    const { acceptPendingCampaignInvite, addPendingCampaignInvite, removePendingCampaignInvite } =
+      await loadDataloader();
 
-    await addCampaignPlayer("gm-1", "campaign-1", "player_name");
-    expect(rpc).toHaveBeenCalledOnce();
-    expect(rpc).toHaveBeenCalledWith("add_campaign_player", {
+    await addPendingCampaignInvite("gm-1", "campaign-1", "player_name");
+    expect(rpc).toHaveBeenCalledWith("add_pending_campaign_invite", {
       requesting_user_id: "gm-1",
       requested_campaign_id: "campaign-1",
-      player_username: "player_name",
+      invited_username: "player_name",
     });
+
+    await removePendingCampaignInvite("player-1", "campaign-1");
+    expect(rpc).toHaveBeenCalledWith("remove_pending_campaign_invite", {
+      requesting_user_id: "player-1",
+      requested_campaign_id: "campaign-1",
+    });
+
+    await acceptPendingCampaignInvite("player-1", "campaign-1");
+    expect(rpc).toHaveBeenCalledWith("accept_campaign_invite", {
+      requesting_user_id: "player-1",
+      requested_campaign_id: "campaign-1",
+    });
+    expect(rpc).toHaveBeenCalledTimes(3);
   });
 
   it("sets selected-player content reveals with one protected RPC call", async () => {
@@ -309,6 +371,43 @@ describe("dataloader", () => {
       content_type: "textbox",
       reveal_to_all: false,
       revealed_profile_ids: ["player-1"],
+    });
+  });
+
+  it("adds player content reveals with one protected RPC call", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    createClient.mockReturnValue({ rpc });
+    const { addEntityContentReveals } = await loadDataloader();
+
+    await addEntityContentReveals("player-1", "textbox-1", "textbox", false, ["player-2"]);
+
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("reveal_entity_content_to_players", {
+      requesting_user_id: "player-1",
+      requested_content_id: "textbox-1",
+      content_type: "textbox",
+      reveal_to_all: false,
+      revealed_profile_ids: ["player-2"],
+    });
+  });
+
+  it("loads entities for a selected user tag with one protected RPC call", async () => {
+    const entities = [
+      {
+        id: "entity-1",
+        name: "The Archive",
+        campaign_id: "campaign-1",
+        campaign_name: "Aster",
+      },
+    ];
+    const rpc = vi.fn().mockResolvedValue({ data: entities, error: null });
+    createClient.mockReturnValue({ rpc });
+    const { getTaggedEntitiesForUser } = await loadDataloader();
+
+    await expect(getTaggedEntitiesForUser("gm-1", "tag-1")).resolves.toEqual(entities);
+    expect(rpc).toHaveBeenCalledWith("get_tagged_entities_for_user", {
+      requesting_user_id: "gm-1",
+      requested_tag_id: "tag-1",
     });
   });
 
@@ -396,16 +495,20 @@ describe("dataloader", () => {
   });
 
   it("surfaces database failures with their code and operation context", async () => {
-    createClient.mockReturnValue({
-      from: vi.fn(() =>
-        queryReturning({ data: null, error: { message: "duplicate value", code: "23505" } }),
-      ),
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "duplicate value", code: "23505" },
     });
+    createClient.mockReturnValue({ rpc });
     const { createCampaign } = await loadDataloader();
 
     await expect(createCampaign("user-1", "Repeated")).rejects.toMatchObject({
       message: "Could not create campaign: duplicate value",
       code: "23505",
+    });
+    expect(rpc).toHaveBeenCalledWith("create_seeded_campaign", {
+      requesting_user_id: "user-1",
+      campaign_name: "Repeated",
     });
   });
 });

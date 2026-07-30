@@ -1,105 +1,105 @@
 import Link from "next/link";
-import { getCampaignDashboard } from "@/app/dataloader";
+import { PageHeader } from "@/app/components/ui";
+import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 import { addCampaign } from "@/app/data/actions";
+import CampaignSection from "@/app/data/campaigns/campaign-section";
+import CampaignInvites from "@/app/data/campaigns/campaign-invites";
+import { normalizeCampaignDashboard } from "@/app/data/campaigns/campaign-dashboard";
+import { getCampaignDashboard } from "@/app/dataloader";
 import { getSession } from "@/lib/session";
-
-type Player = { id: string; username: string };
-type OwnedCampaign = { id: string; name: string; user_id: string; players: Player[] };
-type JoinedCampaign = { id: string; name: string; user_id: string; gm_username: string };
 
 export default async function CampaignsPage() {
   const session = await getSession();
-  const dashboard = session
-    ? await getCampaignDashboard(session.userId)
-    : { owned: [], joined: [] };
-  const owned = dashboard.owned as OwnedCampaign[];
-  const joined = dashboard.joined as JoinedCampaign[];
+  const dashboard = normalizeCampaignDashboard(
+    session ? await getCampaignDashboard(session.userId) : null,
+  );
+  const { owned, incoming_invites: incomingInvites, joined } = dashboard;
 
   return (
     <section className="data-panel">
-      <p className="eyebrow">Your worlds</p>
-      <div className="page-heading">
-        <div>
-          <h1>Campaigns</h1>
-          <p>Manage worlds you run and revisit campaigns you have joined.</p>
-        </div>
-        <form action={addCampaign} className="inline-create-form campaign-create-form">
-          <label className="sr-only" htmlFor="campaign-name">
-            Campaign name
-          </label>
-          <input
-            id="campaign-name"
-            name="name"
-            placeholder="New campaign name"
-            required
-            maxLength={80}
-          />
-          <button className="primary-button">Create campaign</button>
-        </form>
-      </div>
+      <PageHeader
+        eyebrow="Your worlds"
+        title="Campaigns"
+        description="Manage worlds you run and revisit campaigns you have joined."
+        actions={
+          <ActionForm
+            action={addCampaign}
+            className="inline-create-form campaign-create-form"
+            errorMessage="We couldn’t create that campaign. Check the name and try again."
+          >
+            <label className="sr-only" htmlFor="campaign-name">
+              Campaign name
+            </label>
+            <input
+              id="campaign-name"
+              name="name"
+              placeholder="New campaign name"
+              required
+              maxLength={80}
+            />
+            <SubmitButton pendingLabel="Creating…">Create campaign</SubmitButton>
+          </ActionForm>
+        }
+      />
 
-      <section className="campaign-section" aria-labelledby="gm-campaigns">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Game master</p>
-            <h2 id="gm-campaigns">Campaigns you run</h2>
-          </div>
-          <span>{owned.length}</span>
-        </div>
+      <CampaignSection
+        id="gm-campaigns"
+        eyebrow="Game master"
+        title="Campaigns you run"
+        count={owned.length}
+        emptyTitle="No campaigns as GM"
+        emptyDescription="Create a campaign to become its GM."
+      >
+        {owned.map((campaign) => (
+          <article className="campaign-card campaign-manage-card" key={campaign.id}>
+            <Link
+              className="campaign-card-link"
+              href={`/data/campaign-lore?campaign=${campaign.id}`}
+            >
+              <strong>{campaign.name}</strong>
+              <span>Open campaign lore →</span>
+            </Link>
+            <Link className="campaign-manage-link" href={`/data/campaigns/${campaign.id}`}>
+              Manage campaign
+            </Link>
+            <div className="outgoing-invites">
+              <strong>Awaiting response</strong>
+              {campaign.pending_invites.length ? (
+                <ul>
+                  {campaign.pending_invites.map((invite) => (
+                    <li key={invite.id}>@{invite.username}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span>No outstanding invitations</span>
+              )}
+            </div>
+          </article>
+        ))}
+      </CampaignSection>
 
-        {owned.length ? (
-          <div className="campaign-grid">
-            {owned.map((campaign) => (
-              <article className="campaign-card campaign-manage-card" key={campaign.id}>
-                <Link
-                  className="campaign-card-link"
-                  href={`/data/campaign-lore?campaign=${campaign.id}`}
-                >
-                  <strong>{campaign.name}</strong>
-                  <span>Open campaign lore →</span>
-                </Link>
-                <Link className="campaign-manage-link" href={`/data/campaigns/${campaign.id}`}>
-                  Manage campaign
-                </Link>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state compact-empty">
-            <h3>No campaigns as GM</h3>
-            <p>Create a campaign to become its GM.</p>
-          </div>
-        )}
-      </section>
-      <section className="campaign-section" aria-labelledby="player-campaigns">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Player</p>
-            <h2 id="player-campaigns">Campaigns you joined</h2>
-          </div>
-          <span>{joined.length}</span>
-        </div>
-        {joined.length ? (
-          <div className="campaign-grid">
-            {joined.map((campaign) => (
-              <Link
-                className="campaign-card"
-                href={`/data/campaign-lore?campaign=${campaign.id}`}
-                key={campaign.id}
-              >
-                <strong>{campaign.name}</strong>
-                <span>GM: @{campaign.gm_username}</span>
-                <span>Open campaign lore →</span>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state compact-empty">
-            <h3>No player campaigns</h3>
-            <p>Campaigns will appear here after a GM adds your username.</p>
-          </div>
-        )}
-      </section>
+      <CampaignInvites invites={incomingInvites} />
+
+      <CampaignSection
+        id="player-campaigns"
+        eyebrow="Player"
+        title="Campaigns you joined"
+        count={joined.length}
+        emptyTitle="No player campaigns"
+        emptyDescription="Campaigns will appear here after a GM adds your username."
+      >
+        {joined.map((campaign) => (
+          <Link
+            className="campaign-card"
+            href={`/data/campaign-lore?campaign=${campaign.id}`}
+            key={campaign.id}
+          >
+            <strong>{campaign.name}</strong>
+            <span>GM: @{campaign.gm_username}</span>
+            <span>Open campaign lore →</span>
+          </Link>
+        ))}
+      </CampaignSection>
     </section>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { saveTheme } from "@/app/data/actions";
 import { type ThemeId, useAccountTheme } from "@/app/theme-shell";
+import { FormMessage } from "@/app/components/form-feedback";
 
 const themes = [
   { id: "parchment", name: "Parchment", mode: "Light", colors: ["#efe5d1", "#fffaf0", "#75501f"] },
@@ -16,15 +17,19 @@ const themes = [
 export default function ThemeSettings() {
   const { theme, setTheme } = useAccountTheme();
   const [saving, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
 
   function selectTheme(nextTheme: ThemeId) {
     const previousTheme = theme;
+    setError(undefined);
     setTheme(nextTheme);
     startTransition(async () => {
       try {
         await saveTheme(nextTheme);
-      } catch {
+      } catch (reason) {
+        console.error("Theme update failed", reason);
         setTheme(previousTheme);
+        setError("We couldn’t save that theme. Your previous theme has been restored.");
       }
     });
   }
@@ -35,6 +40,7 @@ export default function ThemeSettings() {
       <p className="setting-description">
         Choose how your lore workspace looks. Your choice follows your account across devices.
       </p>
+      <FormMessage>{error}</FormMessage>
       <div className="theme-groups">
         {(["Light", "Dark"] as const).map((mode) => (
           <section

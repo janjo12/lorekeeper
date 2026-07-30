@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import type { AuthState } from "./actions";
+import { FormField } from "@/app/components/ui";
+import { FormMessage, SubmitButton } from "@/app/components/form-feedback";
 
 type Props = {
   mode: "login" | "signup";
@@ -18,18 +20,11 @@ export function AuthForm({ mode, action }: Props) {
   return (
     <form action={formAction} className="auth-form">
       {signingUp && (
-        <div className="field">
-          <label htmlFor="username">Username</label>
+        <FormField label="Username" htmlFor="username" errors={state.errors?.username}>
           <input id="username" name="username" autoComplete="username" required autoFocus />
-          {state.errors?.username?.map((error) => (
-            <p className="field-error" key={error}>
-              {error}
-            </p>
-          ))}
-        </div>
+        </FormField>
       )}
-      <div className="field">
-        <label htmlFor="email">Email</label>
+      <FormField label="Email" htmlFor="email" errors={state.errors?.email}>
         <input
           id="email"
           name="email"
@@ -38,14 +33,8 @@ export function AuthForm({ mode, action }: Props) {
           required
           autoFocus={!signingUp}
         />
-        {state.errors?.email?.map((error) => (
-          <p className="field-error" key={error}>
-            {error}
-          </p>
-        ))}
-      </div>
-      <div className="field">
-        <label htmlFor="password">Password</label>
+      </FormField>
+      <FormField label="Password" htmlFor="password" errors={state.errors?.password}>
         <div className="password-input">
           <input
             id="password"
@@ -64,15 +53,13 @@ export function AuthForm({ mode, action }: Props) {
             {passwordVisible ? "Hide" : "Show"}
           </button>
         </div>
-        {state.errors?.password?.map((error) => (
-          <p className="field-error" key={error}>
-            {error}
-          </p>
-        ))}
-      </div>
+      </FormField>
       {signingUp && (
-        <div className="field">
-          <label htmlFor="confirmPassword">Confirm password</label>
+        <FormField
+          label="Confirm password"
+          htmlFor="confirmPassword"
+          errors={state.errors?.confirmPassword}
+        >
           <div className="password-input">
             <input
               id="confirmPassword"
@@ -91,21 +78,12 @@ export function AuthForm({ mode, action }: Props) {
               {confirmationVisible ? "Hide" : "Show"}
             </button>
           </div>
-          {state.errors?.confirmPassword?.map((error) => (
-            <p className="field-error" key={error}>
-              {error}
-            </p>
-          ))}
-        </div>
+        </FormField>
       )}
-      {state.message && (
-        <p className="form-error" role="alert">
-          {state.message}
-        </p>
-      )}
-      <button className="primary-button" disabled={pending} type="submit">
-        {pending ? "Please wait…" : signingUp ? "Create account" : "Sign in"}
-      </button>
+      <FormMessage>{state.message}</FormMessage>
+      <SubmitButton disabled={pending} pendingLabel="Please wait…">
+        {signingUp ? "Create account" : "Sign in"}
+      </SubmitButton>
       <p className="auth-switch">
         {signingUp ? "Already have an account?" : "New to Lorekeeper?"}{" "}
         <Link href={signingUp ? "/auth/login" : "/auth/signup"}>

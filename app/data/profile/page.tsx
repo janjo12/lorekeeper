@@ -1,13 +1,14 @@
 import { logout } from "@/app/auth/actions";
 import { getSession } from "@/lib/session";
 import ProfileForm from "@/app/data/profile/profile-form";
+import { PageHeader } from "@/app/components/ui";
+import { SubmitButton } from "@/app/components/form-feedback";
 
 export default async function ProfilePage() {
   const session = await getSession();
   return (
     <section className="data-panel profile-panel">
-      <p className="eyebrow">Account</p>
-      <h1>Profile</h1>
+      <PageHeader eyebrow="Account" title="Profile" />
       <div className="profile-row">
         <span>Email</span>
         <strong>{session?.email}</strong>
@@ -19,9 +20,9 @@ export default async function ProfilePage() {
           <p>End your current Lorekeeper session on this device.</p>
         </div>
         <form action={logout}>
-          <button className="secondary-button" type="submit">
+          <SubmitButton variant="secondary" pendingLabel="Signing out…">
             Sign out
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </section>

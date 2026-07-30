@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  addCampaignPlayer,
+  acceptPendingCampaignInvite,
+  addPendingCampaignInvite,
   addEntityComment,
   addEntityImage,
   addEntityTag,
@@ -19,6 +20,8 @@ import {
   moveCategory,
   moveEntity,
   renameCampaign,
+  removePendingCampaignInvite,
+  addEntityContentReveals,
   setEntityContentReveal,
   updateEntityContent,
   updateEntityDetails,
@@ -62,7 +65,7 @@ export async function inviteCampaignPlayer(formData: FormData) {
   const username = formData.get("username")?.toString().trim().toLowerCase().slice(0, 32);
   if (!username) return;
   return campaignAction(formData, (userId, campaignId) =>
-    addCampaignPlayer(userId, campaignId, username),
+    addPendingCampaignInvite(userId, campaignId, username),
   );
 }
 
@@ -74,14 +77,23 @@ export async function inviteCampaignPlayerWithState(
 ): Promise<CampaignPlayerState> {
   try {
     await inviteCampaignPlayer(formData);
-    return { message: "Player added.", success: true };
+    return { message: "Invitation sent.", success: true };
   } catch (error) {
     const message =
-      error instanceof Error && /No user|GM cannot|Only the campaign GM/i.test(error.message)
-        ? error.message.replace(/^Could not add player:\s*/i, "")
-        : "Could not add that player. Check the username and try again.";
+      error instanceof Error &&
+      /No user|GM cannot|Only the campaign GM|already joined/i.test(error.message)
+        ? error.message.replace(/^Could not invite player:\s*/i, "")
+        : "Could not invite that player. Check the username and try again.";
     return { message, success: false };
   }
+}
+
+export async function acceptCampaignInvitation(formData: FormData) {
+  return campaignAction(formData, acceptPendingCampaignInvite);
+}
+
+export async function rejectCampaignInvitation(formData: FormData) {
+  return campaignAction(formData, removePendingCampaignInvite);
 }
 
 export async function removeCampaign(formData: FormData) {
@@ -235,6 +247,18 @@ export async function editEntityContent(formData: FormData) {
 export async function changeEntityContentReveal(formData: FormData) {
   return contentAction(formData, (userId, contentId, type) =>
     setEntityContentReveal(
+      userId,
+      contentId,
+      type,
+      formData.get("revealToAll") === "true",
+      formData.getAll("profileId").map(String),
+    ),
+  );
+}
+
+export async function revealEntityContentToPlayers(formData: FormData) {
+  return contentAction(formData, (userId, contentId, type) =>
+    addEntityContentReveals(
       userId,
       contentId,
       type,

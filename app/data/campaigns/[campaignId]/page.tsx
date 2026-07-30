@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
+import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
+import { FormField } from "@/app/components/ui";
 import AddPlayerForm from "@/app/data/campaigns/add-player-form";
 import { editCampaign, removeCampaign } from "@/app/data/actions";
 import { getCampaignDashboard } from "@/app/dataloader";
 import { getSession } from "@/lib/session";
-
-type Player = { id: string; username: string };
-type OwnedCampaign = { id: string; name: string; user_id: string; players: Player[] };
+import { normalizeCampaignDashboard } from "@/app/data/campaigns/campaign-dashboard";
 
 export default async function CampaignManagementPage({
   params,
@@ -18,8 +18,8 @@ export default async function CampaignManagementPage({
   if (!session) redirect("/auth/login");
 
   const { campaignId } = await params;
-  const dashboard = await getCampaignDashboard(session.userId);
-  const campaign = (dashboard.owned as OwnedCampaign[]).find((item) => item.id === campaignId);
+  const dashboard = normalizeCampaignDashboard(await getCampaignDashboard(session.userId));
+  const campaign = dashboard.owned.find((item) => item.id === campaignId);
   if (!campaign) redirect("/data/campaigns");
 
   return (
@@ -45,19 +45,24 @@ export default async function CampaignManagementPage({
       <div className="campaign-management-grid">
         <section className="management-panel">
           <h2>Campaign details</h2>
-          <form action={editCampaign} className="stacked-form">
+          <ActionForm
+            action={editCampaign}
+            className="stacked-form"
+            errorMessage="We couldn’t rename this campaign. Please try again."
+          >
             <input type="hidden" name="campaignId" value={campaign.id} />
-            <label className="material-field">
-              <span>Campaign name</span>
+            <FormField label="Campaign name" variant="material">
               <input name="name" defaultValue={campaign.name} required maxLength={80} />
-            </label>
-            <button className="secondary-button">Save name</button>
-          </form>
+            </FormField>
+            <SubmitButton variant="secondary" pendingLabel="Saving…">
+              Save name
+            </SubmitButton>
+          </ActionForm>
         </section>
 
         <section className="management-panel">
           <h2>Players</h2>
-          <p>Add an existing Lorekeeper account using its unique username.</p>
+          <p>Invite an existing Lorekeeper account using its unique username.</p>
           <AddPlayerForm campaignId={campaign.id} />
           <div className="campaign-player-list">
             <strong>Current players</strong>
@@ -79,7 +84,10 @@ export default async function CampaignManagementPage({
           <h2>Delete campaign</h2>
           <p>Permanently delete this campaign and all of its lore. This cannot be undone.</p>
         </div>
-        <form action={removeCampaign}>
+        <ActionForm
+          action={removeCampaign}
+          errorMessage="We couldn’t delete this campaign. Please try again."
+        >
           <input type="hidden" name="campaignId" value={campaign.id} />
           <ConfirmDeleteButton
             className="danger-button"
@@ -87,7 +95,7 @@ export default async function CampaignManagementPage({
           >
             Delete campaign
           </ConfirmDeleteButton>
-        </form>
+        </ActionForm>
       </section>
     </section>
   );

@@ -12,6 +12,7 @@ import {
   type LoreEntity,
   type RevealView,
 } from "@/app/data/campaign-lore/lore-visibility";
+import { EmptyState, PageHeader } from "@/app/components/ui";
 
 type AccessibleCampaign = { id: string; name: string; user_id: string };
 
@@ -74,13 +75,11 @@ export default async function CampaignLorePage({
         isGm={isGm}
       />
       <section className="data-panel lore-entities" id="all-lore">
-        <p className="eyebrow">Archive</p>
-        <div className="page-heading">
-          <div>
-            <h1>{lore.campaign.name}</h1>
-            <p>Browse the people, places, and secrets in this world.</p>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="Archive"
+          title={lore.campaign.name}
+          description="Browse the people, places, and secrets in this world."
+        />
         {entities.length ? (
           <div className="entity-grid">
             {entities.map((entity) => (
@@ -98,10 +97,9 @@ export default async function CampaignLorePage({
             ))}
           </div>
         ) : (
-          <div className="empty-state">
-            <h2>No lore entries yet</h2>
-            <p>Create an entity or choose another category.</p>
-          </div>
+          <EmptyState title="No lore entries yet">
+            Create an entity or choose another category.
+          </EmptyState>
         )}
         <CreateFab campaignId={campaignId} categories={categories} />
       </section>

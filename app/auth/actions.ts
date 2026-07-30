@@ -42,7 +42,10 @@ export async function signup(_state: AuthState, formData: FormData): Promise<Aut
 
   try {
     const user = await signupUser(parsed.data.email, parsed.data.username, parsed.data.password);
-    await createSession({ userId: user.id, email: parsed.data.email, username: user.username });
+    await createSession(
+      { userId: user.id, email: parsed.data.email, username: user.username },
+      { accessToken: user.accessToken, refreshToken: user.refreshToken },
+    );
   } catch (error) {
     console.error("Signup failed", error);
     return { message: authErrorMessage(error, "We could not create your account.") };
@@ -56,7 +59,10 @@ export async function login(_state: AuthState, formData: FormData): Promise<Auth
 
   try {
     const user = await loginUser(parsed.data.email, parsed.data.password);
-    await createSession({ userId: user.id, email: parsed.data.email, username: user.username });
+    await createSession(
+      { userId: user.id, email: parsed.data.email, username: user.username },
+      { accessToken: user.accessToken, refreshToken: user.refreshToken },
+    );
   } catch (error) {
     console.error("Login failed", error);
     return { message: authErrorMessage(error, "Invalid email or password.") };

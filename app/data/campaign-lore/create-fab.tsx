@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { addCategory, addLoreEntity } from "@/app/data/actions";
+import { Button, DialogActions, FormField } from "@/app/components/ui";
+import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 
 type Category = { id: string; name: string };
 type CreationMode = "entity" | "category" | null;
@@ -118,20 +120,17 @@ export default function CreateFab({
                 : "Add a category for organizing your lore."}
             </p>
             {mode === "entity" ? (
-              <form
-                action={async (formData) => {
-                  await addLoreEntity(formData);
-                  setMode(null);
-                }}
+              <ActionForm
+                action={addLoreEntity}
                 className="dialog-form"
+                errorMessage="We couldn’t create that entity. Check the details and try again."
+                onSuccess={() => setMode(null)}
               >
                 <input type="hidden" name="campaignId" value={campaignId} />
-                <label className="material-field">
-                  <span>Entity name</span>
+                <FormField label="Entity name" variant="material">
                   <input ref={firstInput} name="name" required maxLength={80} />
-                </label>
-                <label className="material-field">
-                  <span>Category</span>
+                </FormField>
+                <FormField label="Category" variant="material">
                   <select name="categoryId">
                     <option value="">No category</option>
                     {categories.map((category) => (
@@ -140,30 +139,27 @@ export default function CreateFab({
                       </option>
                     ))}
                   </select>
-                </label>
-                <div className="dialog-actions">
-                  <button className="text-action" onClick={() => setMode(null)} type="button">
+                </FormField>
+                <DialogActions>
+                  <Button variant="text" onClick={() => setMode(null)}>
                     Cancel
-                  </button>
-                  <button className="filled-action" type="submit">
+                  </Button>
+                  <SubmitButton variant="filled" pendingLabel="Creating…">
                     Create entity
-                  </button>
-                </div>
-              </form>
+                  </SubmitButton>
+                </DialogActions>
+              </ActionForm>
             ) : (
-              <form
-                action={async (formData) => {
-                  await addCategory(formData);
-                  setMode(null);
-                }}
+              <ActionForm
+                action={addCategory}
                 className="dialog-form"
+                errorMessage="We couldn’t create that category. Check the details and try again."
+                onSuccess={() => setMode(null)}
               >
-                <label className="material-field">
-                  <span>Category name</span>
+                <FormField label="Category name" variant="material">
                   <input ref={firstInput} name="name" required maxLength={80} />
-                </label>
-                <label className="material-field">
-                  <span>Parent category</span>
+                </FormField>
+                <FormField label="Parent category" variant="material">
                   <select name="parentCategoryId">
                     <option value="">Top-level category</option>
                     {categories.map((category) => (
@@ -172,16 +168,16 @@ export default function CreateFab({
                       </option>
                     ))}
                   </select>
-                </label>
-                <div className="dialog-actions">
-                  <button className="text-action" onClick={() => setMode(null)} type="button">
+                </FormField>
+                <DialogActions>
+                  <Button variant="text" onClick={() => setMode(null)}>
                     Cancel
-                  </button>
-                  <button className="filled-action" type="submit">
+                  </Button>
+                  <SubmitButton variant="filled" pendingLabel="Creating…">
                     Create category
-                  </button>
-                </div>
-              </form>
+                  </SubmitButton>
+                </DialogActions>
+              </ActionForm>
             )}
           </section>
         </div>

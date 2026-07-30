@@ -71,25 +71,55 @@ export async function signupUser(email, username, password) {
     user_metadata: { username },
   });
   throwIfError(error, "Could not create user");
-  return { id: data.user.id, username, created_at: data.user.created_at };
+  const auth = await signInForSession(email, password);
+  return {
+    id: data.user.id,
+    username,
+    created_at: data.user.created_at,
+    accessToken: auth.accessToken,
+    refreshToken: auth.refreshToken,
+  };
 }
 
-export async function loginUser(email, password) {
-  const database = getDatabase();
+async function signInForSession(email, password) {
   const { data, error } = await createAuthClient().auth.signInWithPassword({
     email,
     password,
   });
   throwIfError(error, "Invalid email or password");
+  if (!data.session) throw new Error("Invalid email or password: session was not created");
+  return {
+    accessToken: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    authUserId: data.user.id,
+  };
+}
+
+export async function loginUser(email, password) {
+  const database = getDatabase();
+  const auth = await signInForSession(email, password);
   const profileResult = await database
     .from("profile")
     .select("id, username, created_at")
-    .eq("id", data.user.id)
+    .eq("id", auth.authUserId)
     .maybeSingle();
   throwIfError(profileResult.error, "Could not load profile");
   const profile = profileResult.data;
   if (!profile) throw new Error("Could not load profile: profile does not exist");
-  return profile;
+  return { ...profile, accessToken: auth.accessToken, refreshToken: auth.refreshToken };
+}
+
+export async function refreshAuthSession(accessToken, refreshToken) {
+  const { data, error } = await createAuthClient().auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  throwIfError(error, "Could not refresh Realtime authentication");
+  if (!data.session) throw new Error("Could not refresh Realtime authentication: no session");
+  return {
+    accessToken: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+  };
 }
 
 export async function updateProfileUsername(userId, username) {
@@ -144,15 +174,14 @@ export async function getCampaignDashboard(userId) {
     requesting_user_id: userId,
   });
   throwIfError(error, "Could not load campaign dashboard");
-  return data ?? { owned: [], joined: [] };
+  return data ?? { owned: [], incoming_invites: [], joined: [] };
 }
 
 export async function createCampaign(ownerId, name) {
-  const { data, error } = await getDatabase()
-    .from("campaign")
-    .insert({ user_id: ownerId, name })
-    .select("id, name, user_id")
-    .single();
+  const { data, error } = await getDatabase().rpc("create_seeded_campaign", {
+    requesting_user_id: ownerId,
+    campaign_name: name,
+  });
   throwIfError(error, "Could not create campaign");
   return data;
 }
@@ -163,11 +192,23 @@ export const renameCampaign = (userId, campaignId, name) =>
     { requesting_user_id: userId, requested_campaign_id: campaignId, campaign_name: name },
     "Could not rename campaign",
   );
-export const addCampaignPlayer = (userId, campaignId, username) =>
+export const addPendingCampaignInvite = (userId, campaignId, username) =>
   runEntityMutation(
-    "add_campaign_player",
-    { requesting_user_id: userId, requested_campaign_id: campaignId, player_username: username },
-    "Could not add player",
+    "add_pending_campaign_invite",
+    { requesting_user_id: userId, requested_campaign_id: campaignId, invited_username: username },
+    "Could not invite player",
+  );
+export const removePendingCampaignInvite = (userId, campaignId) =>
+  runEntityMutation(
+    "remove_pending_campaign_invite",
+    { requesting_user_id: userId, requested_campaign_id: campaignId },
+    "Could not remove campaign invitation",
+  );
+export const acceptPendingCampaignInvite = (userId, campaignId) =>
+  runEntityMutation(
+    "accept_campaign_invite",
+    { requesting_user_id: userId, requested_campaign_id: campaignId },
+    "Could not accept campaign invitation",
   );
 export const deleteCampaign = (userId, campaignId) =>
   runEntityMutation(
@@ -202,6 +243,15 @@ export async function getTagsForUser(userId) {
     .eq("user_id", userId)
     .order("name");
   throwIfError(error, "Could not load tags");
+  return data ?? [];
+}
+
+export async function getTaggedEntitiesForUser(userId, tagId) {
+  const { data, error } = await getDatabase().rpc("get_tagged_entities_for_user", {
+    requesting_user_id: userId,
+    requested_tag_id: tagId,
+  });
+  throwIfError(error, "Could not load tagged entities");
   return data ?? [];
 }
 
@@ -416,6 +466,18 @@ export const setEntityContentReveal = (userId, contentId, type, revealToAll, pro
       revealed_profile_ids: profileIds,
     },
     "Could not change content reveal",
+  );
+export const addEntityContentReveals = (userId, contentId, type, revealToAll, profileIds) =>
+  runEntityMutation(
+    "reveal_entity_content_to_players",
+    {
+      requesting_user_id: userId,
+      requested_content_id: contentId,
+      content_type: type,
+      reveal_to_all: revealToAll,
+      revealed_profile_ids: profileIds,
+    },
+    "Could not reveal content",
   );
 export async function deleteEntityContent(userId, contentId, type) {
   const { data, error } = await getDatabase().rpc("delete_entity_content", {

@@ -1,6 +1,7 @@
 "use client";
 
 import { changeCategoryParent, removeCategory } from "@/app/data/actions";
+import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 
 type Category = {
   id: string;
@@ -36,7 +37,10 @@ export default function CategoryActions({
     <details className="category-actions">
       <summary aria-label={`Manage ${category.name}`}>•••</summary>
       <div className="category-actions-panel">
-        <form action={changeCategoryParent}>
+        <ActionForm
+          action={changeCategoryParent}
+          errorMessage="We couldn’t move this category. Please try again."
+        >
           <input type="hidden" name="categoryId" value={category.id} />
           <label className="material-field">
             <span>Move category to</span>
@@ -51,11 +55,14 @@ export default function CategoryActions({
                 ))}
             </select>
           </label>
-          <button className="secondary-button">Move</button>
-        </form>
+          <SubmitButton variant="secondary" pendingLabel="Moving…">
+            Move
+          </SubmitButton>
+        </ActionForm>
 
-        <form
+        <ActionForm
           action={removeCategory}
+          errorMessage="We couldn’t delete this category. Please try again."
           onSubmit={(event) => {
             const formData = new FormData(event.currentTarget);
             const deletingContents = formData.get("deleteContents") === "true";
@@ -80,10 +87,10 @@ export default function CategoryActions({
           <p className="danger-note">
             Deleting contents also deletes everything in all subcategories without further prompts.
           </p>
-          <button className="secondary-button is-danger" type="submit">
+          <SubmitButton className="is-danger" variant="secondary" pendingLabel="Deleting…">
             Delete category
-          </button>
-        </form>
+          </SubmitButton>
+        </ActionForm>
       </div>
     </details>
   );

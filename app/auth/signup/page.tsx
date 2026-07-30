@@ -2,18 +2,17 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/app/auth/auth-form";
 import { signup } from "@/app/auth/actions";
 import { getSession } from "@/lib/session";
+import { AuthCard } from "@/app/components/ui";
 
 export default async function SignupPage() {
   if (await getSession()) redirect("/data/campaigns");
   return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <div className="brand-mark">L</div>
-        <p className="eyebrow">Begin a new chronicle</p>
-        <h1>Create your account</h1>
-        <p className="auth-copy">Keep every character, place, and secret close at hand.</p>
-        <AuthForm mode="signup" action={signup} />
-      </section>
-    </main>
+    <AuthCard
+      eyebrow="Begin a new chronicle"
+      title="Create your account"
+      description="Keep every character, place, and secret close at hand."
+    >
+      <AuthForm mode="signup" action={signup} />
+    </AuthCard>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createEntityImage, createEntityTextbox } from "@/app/data/actions";
+import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
+import { Button, DialogActions, FormField } from "@/app/components/ui";
 
 type Mode = "textbox" | "image" | null;
 
@@ -65,43 +67,39 @@ export default function EntityContentFab({ entityId }: { entityId: string }) {
               Use another entity&apos;s exact, case-sensitive name in a content name or textbox to
               create a link. Players only receive links to entities visible to them.
             </p>
-            <form
-              action={async (data) => {
-                await (mode === "textbox" ? createEntityTextbox(data) : createEntityImage(data));
-                setMode(null);
-              }}
+            <ActionForm
+              action={mode === "textbox" ? createEntityTextbox : createEntityImage}
               className="dialog-form"
+              errorMessage={`We couldn’t add that ${mode}. Check the details and try again.`}
+              onSuccess={() => setMode(null)}
             >
               <input type="hidden" name="entityId" value={entityId} />
-              <label className="material-field">
-                <span>Name</span>
+              <FormField label="Name" variant="material">
                 <input name="name" required maxLength={80} />
-              </label>
+              </FormField>
               {mode === "textbox" ? (
-                <label className="material-field">
-                  <span>Content</span>
+                <FormField label="Content" variant="material">
                   <textarea name="content" required rows={7} />
-                </label>
+                </FormField>
               ) : (
-                <label className="material-field">
-                  <span>Image file</span>
+                <FormField label="Image file" variant="material">
                   <input
                     name="image"
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     required
                   />
-                </label>
+                </FormField>
               )}
-              <div className="dialog-actions">
-                <button className="text-action" onClick={() => setMode(null)} type="button">
+              <DialogActions>
+                <Button variant="text" onClick={() => setMode(null)}>
                   Cancel
-                </button>
-                <button className="filled-action" type="submit">
+                </Button>
+                <SubmitButton variant="filled" pendingLabel="Adding…">
                   Add {mode}
-                </button>
-              </div>
-            </form>
+                </SubmitButton>
+              </DialogActions>
+            </ActionForm>
           </section>
         </div>
       )}

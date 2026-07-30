@@ -1,10 +1,10 @@
 import ThemeSettings from "@/app/theme-settings";
+import { PageHeader } from "@/app/components/ui";
 
 export default function SettingsPage() {
   return (
     <section className="settings-panel" aria-labelledby="settings-title">
-      <p className="eyebrow">Preferences</p>
-      <h1 id="settings-title">Settings</h1>
+      <PageHeader eyebrow="Preferences" title="Settings" titleId="settings-title" />
       <ThemeSettings />
     </section>
   );
