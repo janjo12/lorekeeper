@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import {
   parseRealtimeNotification,
   type RealtimeNotification,
-} from "@/app/data/notifications/notification";
+} from "./notification";
 
 const TOKEN_REFRESH_INTERVAL = 45 * 60 * 1000;
 
@@ -67,7 +67,11 @@ export default function NotificationCenter({ userId }: { userId: string }) {
   return (
     <aside className="notification-center" aria-label="Notifications" aria-live="polite">
       {notifications.map((notification) => (
-        <article className="notification-toast" key={notification.id}>
+        <article
+          className={`notification-toast is-${notification.kind.replace("_", "-")}`}
+          key={notification.id}
+          role="status"
+        >
           <Link href={notification.href} onClick={() => dismiss(notification.id)}>
             <strong>{notification.title}</strong>
             <span>{notification.body}</span>

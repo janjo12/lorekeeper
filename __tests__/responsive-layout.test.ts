@@ -35,7 +35,7 @@ describe("responsive navigation", () => {
 describe("compact inline form sizing", () => {
   it("shares a compact control height between campaign and tag creation", () => {
     expect(css).toMatch(
-      /\.compact-inline-form\s*\{[^}]*--inline-control-height:\s*2\.25rem;[^}]*align-items:\s*center;[^}]*min-height:\s*0;[^}]*height:\s*auto;/,
+      /\.compact-inline-form\s*\{[^}]*--inline-control-height:\s*2\.25rem;[^}]*min-height:\s*0;[^}]*height:\s*auto;/,
     );
     expect(css).toMatch(
       /\.compact-inline-form input,\s*\.compact-inline-form select,\s*\.compact-inline-form \.primary-button,\s*\.compact-inline-form \.secondary-button\s*\{[^}]*min-height:\s*0;[^}]*height:\s*var\(--inline-control-height\);[^}]*padding-block:\s*0;/,
@@ -46,19 +46,33 @@ describe("compact inline form sizing", () => {
     expect(entityView).toContain('className="inline-create-form compact-inline-form"');
   });
 
-  it("keeps the campaign-specific widths and responsive alignment", () => {
+  it("uses non-growing, full-width mobile controls by default", () => {
+    expect(css).toMatch(
+      /\.inline-create-form\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*stretch;/,
+    );
+    expect(css).toMatch(
+      /\.inline-create-form input\s*\{[^}]*flex:\s*0 0 auto;[^}]*width:\s*100%;[^}]*min-width:\s*0;/,
+    );
+    expect(css).toMatch(
+      /\.inline-create-form select\s*\{[^}]*flex:\s*0 0 auto;[^}]*width:\s*100%;[^}]*min-width:\s*0;/,
+    );
+    expect(css).toMatch(/\.campaign-create-form\s*\{[^}]*align-self:\s*stretch;/);
+  });
+
+  it("adds horizontal layout and campaign-specific width caps only on wide screens", () => {
     expect(css).toContain("--campaign-input-max-width: 18rem");
     expect(css).toContain("--campaign-button-max-width: 12rem");
-    expect(css).toMatch(/\.campaign-create-form\s*\{[^}]*align-self:\s*flex-end;/);
     expect(css).toMatch(
-      /\.campaign-create-form input\s*\{[^}]*max-width:\s*var\(--campaign-input-max-width\);/,
+      /@media \(min-width: 64\.0625rem\)\s*\{[\s\S]*?\.inline-create-form\s*\{[^}]*flex-flow:\s*row wrap;[^}]*align-items:\s*center;/,
     );
     expect(css).toMatch(
-      /\.campaign-create-form \.primary-button\s*\{[^}]*max-width:\s*var\(--campaign-button-max-width\);/,
+      /@media \(min-width: 64\.0625rem\)\s*\{[\s\S]*?\.campaign-create-form\s*\{[^}]*align-self:\s*flex-end;/,
     );
     expect(css).toMatch(
-      /\.inline-create-form input\s*\{[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/,
+      /@media \(min-width: 64\.0625rem\)\s*\{[\s\S]*?\.campaign-create-form input\s*\{[^}]*max-width:\s*var\(--campaign-input-max-width\);/,
     );
-    expect(css).toMatch(/\.campaign-create-form\s*\{[^}]*align-self:\s*stretch;[^}]*\}/);
+    expect(css).toMatch(
+      /@media \(min-width: 64\.0625rem\)\s*\{[\s\S]*?\.campaign-create-form \.primary-button\s*\{[^}]*max-width:\s*var\(--campaign-button-max-width\);/,
+    );
   });
 });

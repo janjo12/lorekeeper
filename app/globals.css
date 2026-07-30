@@ -484,6 +484,23 @@ input {
   box-shadow: 0 12px 32px #0005;
   pointer-events: auto;
 }
+.notification-toast.is-lore-reveal {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0.25rem 0 var(--accent),
+    0 12px 32px #0005;
+}
+.notification-toast.is-lore-reveal::before {
+  content: "✦";
+  position: absolute;
+  top: 0.55rem;
+  left: 0.65rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+.notification-toast.is-lore-reveal a {
+  padding-left: 1.75rem;
+}
 .notification-toast a {
   display: grid;
   gap: 0.3rem;
@@ -661,15 +678,16 @@ input {
 }
 .inline-create-form {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.6rem;
   min-width: 0;
   max-width: 100%;
 }
 .inline-create-form input {
-  flex: 1 1 14rem;
+  flex: 0 0 auto;
   width: 100%;
-  min-width: min(14rem, 100%);
+  min-width: 0;
   max-width: 100%;
   padding: 0.75rem;
   border: 1px solid var(--border);
@@ -679,7 +697,6 @@ input {
 }
 .compact-inline-form {
   --inline-control-height: 2.25rem;
-  align-items: center;
   min-height: 0;
   height: auto;
 }
@@ -694,18 +711,14 @@ input {
 .campaign-create-form {
   --campaign-input-max-width: 18rem;
   --campaign-button-max-width: 12rem;
-  align-self: flex-end;
-}
-.campaign-create-form input {
-  flex-basis: 13rem;
-  max-width: var(--campaign-input-max-width);
+  align-self: stretch;
 }
 .campaign-create-form .primary-button {
   width: 100%;
-  max-width: var(--campaign-button-max-width);
 }
 .inline-create-form select {
-  flex: 1 1 10rem;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   padding: 0.75rem;
@@ -713,6 +726,30 @@ input {
   border-radius: 0.45rem;
   background: var(--surface);
   color: var(--shell-text);
+}
+@media (min-width: 64.0625rem) {
+  .inline-create-form {
+    flex-flow: row wrap;
+    align-items: center;
+  }
+  .inline-create-form input {
+    flex: 1 1 14rem;
+    min-width: min(14rem, 100%);
+  }
+  .inline-create-form select {
+    flex: 1 1 10rem;
+    width: auto;
+  }
+  .campaign-create-form {
+    align-self: flex-end;
+  }
+  .campaign-create-form input {
+    flex-basis: 13rem;
+    max-width: var(--campaign-input-max-width);
+  }
+  .campaign-create-form .primary-button {
+    max-width: var(--campaign-button-max-width);
+  }
 }
 .entity-create-form {
   margin-bottom: 1.5rem;
@@ -1834,20 +1871,12 @@ input {
     grid-template-columns: 1fr;
   }
   .page-heading,
-  .inline-create-form,
   .danger-zone {
     align-items: stretch;
     flex-direction: column;
   }
   .profile-form {
     grid-template-columns: 1fr;
-  }
-  .inline-create-form input {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-  .campaign-create-form {
-    align-self: stretch;
   }
   .entity-create-form,
   .category-create-form {
