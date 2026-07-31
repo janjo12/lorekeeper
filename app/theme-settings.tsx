@@ -6,12 +6,12 @@ import { type ThemeId, useAccountTheme } from "@/app/theme-shell";
 import { FormMessage } from "@/app/components/form-feedback";
 
 const themes = [
-  { id: "parchment", name: "Parchment", mode: "Light", colors: ["#efe5d1", "#fffaf0", "#75501f"] },
-  { id: "ivory", name: "Ivory", mode: "Light", colors: ["#f5f2ea", "#ffffff", "#375f6b"] },
-  { id: "sage", name: "Sage", mode: "Light", colors: ["#e5eadf", "#f8faf4", "#516346"] },
-  { id: "midnight", name: "Midnight", mode: "Dark", colors: ["#111827", "#1f2937", "#7dd3fc"] },
-  { id: "ember", name: "Ember", mode: "Dark", colors: ["#211714", "#34231e", "#e89b64"] },
-  { id: "ink", name: "Ink", mode: "Dark", colors: ["#151515", "#242424", "#d6c5a1"] },
+  { id: "parchment", name: "Parchment", mode: "Light", colors: ["#efe5d1", "#fffaf0", "#5b3a13"] },
+  { id: "ivory", name: "Ivory", mode: "Light", colors: ["#f5f2ea", "#ffffff", "#294f5a"] },
+  { id: "sage", name: "Sage", mode: "Light", colors: ["#e5eadf", "#f8faf4", "#374b2f"] },
+  { id: "midnight", name: "Midnight", mode: "Dark", colors: ["#0d1422", "#182433", "#9bddfc"] },
+  { id: "ember", name: "Ember", mode: "Dark", colors: ["#1b110f", "#2d1c18", "#ffc092"] },
+  { id: "ink", name: "Ink", mode: "Dark", colors: ["#101010", "#202020", "#e3d2ae"] },
 ] as const;
 
 export default function ThemeSettings() {
