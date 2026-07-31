@@ -511,4 +511,29 @@ describe("dataloader", () => {
       campaign_name: "Repeated",
     });
   });
+
+  it("still creates a campaign when the seeded-campaign migration is not deployed", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "PGRST202",
+        message:
+          "Could not find the function public.create_seeded_campaign(campaign_name, requesting_user_id) in the schema cache",
+      },
+    });
+    const insertedCampaign = { id: "campaign-1", name: "Fresh World", user_id: "user-1" };
+    const insertQuery = queryReturning({ data: insertedCampaign, error: null });
+    const database = { rpc, from: vi.fn(() => insertQuery) };
+    createClient.mockReturnValue(database);
+    const { createCampaign } = await loadDataloader();
+
+    await expect(createCampaign("user-1", "Fresh World")).resolves.toEqual(insertedCampaign);
+    expect(database.from).toHaveBeenCalledWith("campaign");
+    expect(insertQuery.insert).toHaveBeenCalledWith({
+      user_id: "user-1",
+      name: "Fresh World",
+    });
+    expect(insertQuery.select).toHaveBeenCalledWith("id, name, user_id");
+    expect(insertQuery.single).toHaveBeenCalledOnce();
+  });
 });

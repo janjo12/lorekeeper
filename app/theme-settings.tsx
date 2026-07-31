@@ -2,10 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { saveTheme } from "@/app/data/actions";
-import { type ThemeId, useAccountTheme } from "@/app/theme-shell";
+import { type ThemePreference, useAccountTheme } from "@/app/theme-shell";
 import { FormMessage } from "@/app/components/form-feedback";
 
 const themes = [
+  {
+    id: "system",
+    name: "System",
+    mode: "Automatic",
+    colors: ["#efe5d1", "#182433", "#9bddfc"],
+  },
   { id: "parchment", name: "Parchment", mode: "Light", colors: ["#efe5d1", "#fffaf0", "#5b3a13"] },
   { id: "ivory", name: "Ivory", mode: "Light", colors: ["#f5f2ea", "#ffffff", "#294f5a"] },
   { id: "sage", name: "Sage", mode: "Light", colors: ["#e5eadf", "#f8faf4", "#374b2f"] },
@@ -15,12 +21,12 @@ const themes = [
 ] as const;
 
 export default function ThemeSettings() {
-  const { theme, setTheme } = useAccountTheme();
+  const { preference, setTheme } = useAccountTheme();
   const [saving, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
-  function selectTheme(nextTheme: ThemeId) {
-    const previousTheme = theme;
+  function selectTheme(nextTheme: ThemePreference) {
+    const previousTheme = preference;
     setError(undefined);
     setTheme(nextTheme);
     startTransition(async () => {
@@ -42,7 +48,7 @@ export default function ThemeSettings() {
       </p>
       <FormMessage>{error}</FormMessage>
       <div className="theme-groups">
-        {(["Light", "Dark"] as const).map((mode) => (
+        {(["Automatic", "Light", "Dark"] as const).map((mode) => (
           <section
             className="theme-group"
             key={mode}
@@ -54,11 +60,11 @@ export default function ThemeSettings() {
                 .filter((option) => option.mode === mode)
                 .map((option) => (
                   <label
-                    className={`theme-option${theme === option.id ? " is-selected" : ""}`}
+                    className={`theme-option${preference === option.id ? " is-selected" : ""}`}
                     key={option.id}
                   >
                     <input
-                      checked={theme === option.id}
+                      checked={preference === option.id}
                       name="theme"
                       onChange={() => selectTheme(option.id)}
                       type="radio"

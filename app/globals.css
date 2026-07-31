@@ -127,7 +127,7 @@ input {
 }
 .eyebrow {
   margin: 0 0 0.5rem;
-  color: #8b6429;
+  color: var(--accent, #8b6429);
   font-family: Arial, sans-serif;
   font-size: 0.75rem;
   font-weight: 700;
@@ -207,21 +207,21 @@ input {
 .field-error,
 .form-error {
   margin: 0;
-  color: #9c3028;
+  color: var(--danger, #9c3028);
   font-family: Arial, sans-serif;
   font-size: 0.8rem;
 }
 .form-error {
   padding: 0.75rem;
   border-radius: 0.4rem;
-  background: #9c302815;
+  background: color-mix(in srgb, var(--danger, #9c3028) 10%, transparent);
   text-align: center;
 }
 .primary-button {
   border: 0;
   border-radius: 0.45rem;
-  background: #75501f;
-  color: #fffaf0;
+  background: var(--accent, #75501f);
+  color: var(--surface, #fffaf0);
   padding: 0.8rem 1rem;
   cursor: pointer;
   font-family: Arial, sans-serif;
@@ -229,7 +229,11 @@ input {
   max-width: 19rem;
 }
 .primary-button:hover {
-  background: #5f3e15;
+  background: color-mix(
+    in srgb,
+    var(--accent, #75501f) 88%,
+    var(--shell-text, #241d16)
+  );
 }
 .primary-button:disabled {
   cursor: wait;
@@ -394,7 +398,7 @@ input {
 .wordmark {
   display: block;
   margin: 0 0.75rem 2rem;
-  color: #dfbd7c;
+  color: var(--sidebar-accent);
   font-size: 1.35rem;
   font-weight: 700;
 }
@@ -446,7 +450,7 @@ input {
 .nav-label small {
   max-width: 10rem;
   overflow: hidden;
-  color: #b9aa96;
+  color: color-mix(in srgb, var(--sidebar-text) 78%, transparent);
   font-size: 0.68rem;
   font-weight: 400;
   text-overflow: ellipsis;
@@ -461,7 +465,7 @@ input {
   display: block;
   overflow: hidden;
   margin-bottom: 0.5rem;
-  color: #b9aa96;
+  color: color-mix(in srgb, var(--sidebar-text) 78%, transparent);
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -470,14 +474,14 @@ input {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #f2d7a4;
+  color: var(--sidebar-accent);
   cursor: pointer;
   font-size: 0.85rem;
   text-decoration: underline;
   text-underline-offset: 0.2rem;
 }
 .sign-out-button:hover {
-  color: #fff4dd;
+  color: var(--sidebar-text);
 }
 .notification-center {
   position: fixed;
@@ -1799,7 +1803,7 @@ input {
     padding: 0 0.75rem;
   }
   .mobile-wordmark {
-    color: #dfbd7c;
+    color: var(--sidebar-accent);
     font-size: 1.15rem;
     font-weight: 700;
   }

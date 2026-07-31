@@ -56,6 +56,18 @@ function paletteFor(theme: (typeof themeIds)[number]) {
 }
 
 describe("theme contrast", () => {
+  it("uses theme variables for shared controls and themed text", () => {
+    expect(css).toMatch(
+      /\.primary-button\s*\{[^}]*background:\s*var\(--accent,\s*#75501f\);[^}]*color:\s*var\(--surface,\s*#fffaf0\);/,
+    );
+    expect(css).toMatch(/\.eyebrow\s*\{[^}]*color:\s*var\(--accent,\s*#8b6429\);/);
+    expect(css).toMatch(/\.wordmark\s*\{[^}]*color:\s*var\(--sidebar-accent\);/);
+    expect(css).toMatch(/\.sign-out-button\s*\{[^}]*color:\s*var\(--sidebar-accent\);/);
+    expect(css).toMatch(
+      /\.field-error,\s*\.form-error\s*\{[^}]*color:\s*var\(--danger,\s*#9c3028\);/,
+    );
+  });
+
   it.each(themeIds)("%s keeps normal text at AAA contrast", (theme) => {
     const palette = paletteFor(theme);
 

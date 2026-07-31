@@ -272,7 +272,15 @@ export async function removeEntityContent(formData: FormData) {
   return contentAction(formData, deleteEntityContent);
 }
 
-const allowedThemes = new Set(["parchment", "ivory", "sage", "midnight", "ember", "ink"]);
+const allowedThemes = new Set([
+  "system",
+  "parchment",
+  "ivory",
+  "sage",
+  "midnight",
+  "ember",
+  "ink",
+]);
 
 export async function saveTheme(theme: string) {
   const session = await getSession();

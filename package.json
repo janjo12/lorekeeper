@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:backend-contract": "node scripts/check-backend-contract.mjs",
     "format": "prettier --write app"
   },
   "dependencies": {

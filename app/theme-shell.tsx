@@ -1,16 +1,19 @@
 "use client";
 
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import {
+  isThemePreference,
+  type ThemeId,
+  type ThemePreference,
+} from "./theme";
 
-export type ThemeId = "parchment" | "ivory" | "sage" | "midnight" | "ember" | "ink";
-const validThemes = new Set<ThemeId>(["parchment", "ivory", "sage", "midnight", "ember", "ink"]);
-const ThemeContext = createContext<{ theme: ThemeId; setTheme: (theme: ThemeId) => void } | null>(
-  null,
-);
+export type { ThemeId, ThemePreference } from "./theme";
 
-function validTheme(theme: string): theme is ThemeId {
-  return validThemes.has(theme as ThemeId);
-}
+const ThemeContext = createContext<{
+  theme: ThemeId;
+  preference: ThemePreference;
+  setTheme: (theme: ThemePreference) => void;
+} | null>(null);
 
 export default function ThemeShell({
   children,
@@ -21,15 +24,39 @@ export default function ThemeShell({
   initialTheme: string;
   userId: string;
 }) {
-  const accountTheme = validTheme(initialTheme) ? initialTheme : "parchment";
-  const [theme, setTheme] = useState<ThemeId>(accountTheme);
+  const accountPreference = isThemePreference(initialTheme) ? initialTheme : "system";
+  const [preference, setTheme] = useState<ThemePreference>(accountPreference);
+  const [systemTheme, setSystemTheme] = useState<ThemeId>("parchment");
   const storageKey = `lorekeeper-theme:${userId}`;
 
   useEffect(() => {
-    window.localStorage.setItem(storageKey, theme);
-  }, [storageKey, theme]);
+    const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateSystemTheme = () => setSystemTheme(colorScheme.matches ? "midnight" : "parchment");
+    updateSystemTheme();
+    colorScheme.addEventListener("change", updateSystemTheme);
+    return () => colorScheme.removeEventListener("change", updateSystemTheme);
+  }, []);
 
-  const value = useMemo(() => ({ theme, setTheme }), [theme]);
+  useEffect(() => {
+    // Before the system preference existed, untouched accounts were stored as
+    // parchment. A local value means the user has already used the theme UI.
+    if (initialTheme === "parchment" && !window.localStorage.getItem(storageKey)) {
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) setTheme("system");
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [initialTheme, storageKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem(storageKey, preference);
+  }, [preference, storageKey]);
+
+  const theme = preference === "system" ? systemTheme : preference;
+  const value = useMemo(() => ({ theme, preference, setTheme }), [preference, theme]);
   return (
     <ThemeContext value={value}>
       <main className="lore-shell" data-theme={theme}>

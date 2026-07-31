@@ -150,7 +150,7 @@ export async function getUserPreferences(userId) {
     .eq("id", userId)
     .maybeSingle();
   throwIfError(error, "Could not load user preferences");
-  return data ?? { last_campaign_id: null, theme_setting: "parchment" };
+  return data ?? { last_campaign_id: null, theme_setting: "system" };
 }
 
 export async function updateThemeSetting(userId, theme) {
@@ -178,10 +178,25 @@ export async function getCampaignDashboard(userId) {
 }
 
 export async function createCampaign(ownerId, name) {
-  const { data, error } = await getDatabase().rpc("create_seeded_campaign", {
+  const database = getDatabase();
+  const { data, error } = await database.rpc("create_seeded_campaign", {
     requesting_user_id: ownerId,
     campaign_name: name,
   });
+  if (
+    error?.code === "PGRST202" &&
+    /create_seeded_campaign/i.test(error.message ?? "")
+  ) {
+    // Keep campaign creation available when application code reaches an
+    // environment before the optional starter-lore migration has been pushed.
+    const { data: campaign, error: insertError } = await database
+      .from("campaign")
+      .insert({ user_id: ownerId, name })
+      .select("id, name, user_id")
+      .single();
+    throwIfError(insertError, "Could not create campaign");
+    return campaign;
+  }
   throwIfError(error, "Could not create campaign");
   return data;
 }
