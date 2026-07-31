@@ -35,11 +35,12 @@ describe("responsive navigation", () => {
 describe("compact inline form sizing", () => {
   it("shares a compact control height between campaign and tag creation", () => {
     expect(css).toMatch(
-      /\.compact-inline-form\s*\{[^}]*--inline-control-height:\s*2\.25rem;[^}]*min-height:\s*0;[^}]*height:\s*auto;/,
+      /\.compact-inline-form\s*\{[^}]*--inline-control-min-height:\s*2\.25rem;[^}]*min-height:\s*0;[^}]*height:\s*auto;/,
     );
     expect(css).toMatch(
-      /\.compact-inline-form input,\s*\.compact-inline-form select,\s*\.compact-inline-form \.primary-button,\s*\.compact-inline-form \.secondary-button\s*\{[^}]*min-height:\s*0;[^}]*height:\s*var\(--inline-control-height\);[^}]*padding-block:\s*0;/,
+      /\.compact-inline-form input,\s*\.compact-inline-form select,\s*\.compact-inline-form \.primary-button,\s*\.compact-inline-form \.secondary-button\s*\{[^}]*min-height:\s*var\(--inline-control-min-height\);[^}]*height:\s*auto;[^}]*padding-block:\s*0\.25rem;[^}]*line-height:\s*1\.25rem;/,
     );
+    expect(css).not.toContain("height: var(--inline-control-height)");
     expect(campaignsPage).toContain(
       'className="inline-create-form compact-inline-form campaign-create-form"',
     );

@@ -696,7 +696,7 @@ input {
   color: var(--shell-text);
 }
 .compact-inline-form {
-  --inline-control-height: 2.25rem;
+  --inline-control-min-height: 2.25rem;
   min-height: 0;
   height: auto;
 }
@@ -704,9 +704,10 @@ input {
 .compact-inline-form select,
 .compact-inline-form .primary-button,
 .compact-inline-form .secondary-button {
-  min-height: 0;
-  height: var(--inline-control-height);
-  padding-block: 0;
+  min-height: var(--inline-control-min-height);
+  height: auto;
+  padding-block: 0.25rem;
+  line-height: 1.25rem;
 }
 .campaign-create-form {
   --campaign-input-max-width: 18rem;
