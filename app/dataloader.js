@@ -1,8 +1,13 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 let client;
 let clientConfigKey;
+
+// ---------------------------------------------------------------------------
+// Server client and configuration
+// ---------------------------------------------------------------------------
 
 function getSupabaseConfig() {
   const url = firstEnvironmentValue("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
@@ -133,6 +138,102 @@ export async function updateProfileUsername(userId, username) {
   return data;
 }
 
+// ---------------------------------------------------------------------------
+// Account AI API credentials
+// ---------------------------------------------------------------------------
+
+function getAiCredentialEncryptionKey() {
+  const secret = firstEnvironmentValue("AI_API_ENCRYPTION_SECRET", "SESSION_SECRET");
+  if (!secret || secret.length < 32) {
+    throw new Error("AI_API_ENCRYPTION_SECRET must be at least 32 characters.");
+  }
+  return createHash("sha256").update(secret).digest();
+}
+
+function encryptAiApiKey(apiKey) {
+  const initializationVector = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", getAiCredentialEncryptionKey(), initializationVector);
+  const encrypted = Buffer.concat([cipher.update(apiKey, "utf8"), cipher.final()]);
+  return [
+    "v1",
+    initializationVector.toString("base64url"),
+    cipher.getAuthTag().toString("base64url"),
+    encrypted.toString("base64url"),
+  ].join(".");
+}
+
+function decryptAiApiKey(value) {
+  const [version, initializationVector, authenticationTag, encrypted] = value.split(".");
+  if (version !== "v1" || !initializationVector || !authenticationTag || !encrypted) {
+    throw new Error("AI API credential has an unsupported encryption format.");
+  }
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    getAiCredentialEncryptionKey(),
+    Buffer.from(initializationVector, "base64url"),
+  );
+  decipher.setAuthTag(Buffer.from(authenticationTag, "base64url"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(encrypted, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+export async function getAiApisForUser(userId) {
+  const { data, error } = await getDatabase()
+    .from("profile_ai_api")
+    .select("id, name, provider, base_url, key_last_four, is_default, created_at")
+    .eq("profile_id", userId)
+    .order("created_at");
+  throwIfError(error, "Could not load AI APIs");
+  return data ?? [];
+}
+
+export async function createAiApiForUser(userId, values) {
+  const { data, error } = await getDatabase().rpc("create_profile_ai_api", {
+    requesting_user_id: userId,
+    api_name: values.name,
+    api_provider: values.provider,
+    api_base_url: values.baseUrl || "",
+    encrypted_key: encryptAiApiKey(values.apiKey),
+    key_suffix: values.apiKey.slice(-4),
+    make_default: values.makeDefault,
+  });
+  throwIfError(error, "Could not add AI API");
+  return data;
+}
+
+export async function setDefaultAiApiForUser(userId, apiId) {
+  const { error } = await getDatabase().rpc("set_default_profile_ai_api", {
+    requesting_user_id: userId,
+    requested_api_id: apiId,
+  });
+  throwIfError(error, "Could not change the default AI API");
+}
+
+export async function deleteAiApiForUser(userId, apiId) {
+  const { error } = await getDatabase().rpc("delete_profile_ai_api", {
+    requesting_user_id: userId,
+    requested_api_id: apiId,
+  });
+  throwIfError(error, "Could not delete AI API");
+}
+
+// Future generation tasks can call this server-only function after selecting
+// an account-owned credential. Never return its apiKey from an action or route.
+export async function getAiApiCredentialForTask(userId, apiId) {
+  let query = getDatabase()
+    .from("profile_ai_api")
+    .select("id, name, provider, base_url, encrypted_api_key")
+    .eq("profile_id", userId);
+  query = apiId ? query.eq("id", apiId) : query.eq("is_default", true);
+  const { data, error } = await query.maybeSingle();
+  throwIfError(error, "Could not load AI API credential");
+  if (!data) return null;
+  const { encrypted_api_key, ...metadata } = data;
+  return { ...metadata, apiKey: decryptAiApiKey(encrypted_api_key) };
+}
+
 export async function getUserById(userId) {
   const { data, error } = await getDatabase()
     .from("profile")
@@ -238,17 +339,34 @@ export async function getCampaignLore(campaignId, userId) {
     requested_campaign_id: campaignId,
   });
   throwIfError(error, "Could not load campaign lore");
-  if (!data) return data;
+  return data;
+}
 
-  // Categories belong to the campaign GM. Joined players need the same tree so
-  // the page can reveal only branches containing content visible to them.
-  const { data: categories, error: categoriesError } = await getDatabase()
-    .from("category")
-    .select("id, name, parent_category_id")
-    .eq("user_id", data.campaign.user_id)
-    .order("name");
-  throwIfError(categoriesError, "Could not load campaign categories");
-  return { ...data, categories: categories ?? [] };
+// ---------------------------------------------------------------------------
+// Progressive lore search hydration
+// ---------------------------------------------------------------------------
+
+export async function getCampaignSearchCorpus(campaignId, userId) {
+  const database = getDatabase();
+  const { data, error } = await database.rpc("get_campaign_search_corpus", {
+    requesting_user_id: userId,
+    requested_campaign_id: campaignId,
+  });
+  throwIfError(error, "Could not load campaign search data");
+  if (!data) return null;
+
+  // Signing does not download files; the browser requests an image only when
+  // its matching result is rendered.
+  const images = data.images ?? [];
+  if (!images.length) return data;
+  const { data: signed, error: signedError } = await database.storage
+    .from("entity-images")
+    .createSignedUrls(images.map((image) => image.storage_path), 60 * 10);
+  throwIfError(signedError, "Could not create search image links");
+  return {
+    ...data,
+    images: images.map((image, index) => ({ ...image, signed_url: signed[index]?.signedUrl })),
+  };
 }
 
 export async function getTagsForUser(userId) {
@@ -280,11 +398,21 @@ export async function createTag(userId, name) {
   return data;
 }
 
-export async function createCategory(userId, name, parentCategoryId) {
+export async function createCategory(campaignId, userId, name, parentCategoryId) {
+  const { data: campaign, error: campaignError } = await getDatabase()
+    .from("campaign")
+    .select("id")
+    .eq("id", campaignId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  throwIfError(campaignError, "Could not load campaign");
+  if (!campaign) throw new Error("Could not create category: only the campaign GM can add categories");
+
+  if (parentCategoryId) await getOwnedCategory(userId, parentCategoryId, campaignId);
   const { data, error } = await getDatabase()
     .from("category")
     .insert({
-      user_id: userId,
+      campaign_id: campaignId,
       name,
       parent_category_id: parentCategoryId || null,
     })
@@ -345,33 +473,34 @@ export const updateEntityDetails = (userId, entityId, name, categoryId) =>
     "Could not update entity",
   );
 
-async function getOwnedCategory(userId, categoryId) {
-  const { data, error } = await getDatabase()
+async function getOwnedCategory(userId, categoryId, campaignId) {
+  let query = getDatabase()
     .from("category")
-    .select("id, parent_category_id")
+    .select("id, parent_category_id, campaign_id, campaign!inner(user_id)")
     .eq("id", categoryId)
-    .eq("user_id", userId)
-    .maybeSingle();
+    .eq("campaign.user_id", userId);
+  if (campaignId) query = query.eq("campaign_id", campaignId);
+  const { data, error } = await query.maybeSingle();
   throwIfError(error, "Could not load category");
   if (!data) throw new Error("Could not load category: category does not exist");
   return data;
 }
 
-async function assertOwnedDestinationCategory(userId, categoryId) {
+async function assertOwnedDestinationCategory(userId, categoryId, campaignId) {
   if (!categoryId) return null;
-  return getOwnedCategory(userId, categoryId);
+  return getOwnedCategory(userId, categoryId, campaignId);
 }
 
 export async function moveEntity(userId, entityId, categoryId) {
-  await assertOwnedDestinationCategory(userId, categoryId);
   const { data: entity, error: entityError } = await getDatabase()
     .from("entity")
-    .select("id, campaign!inner(user_id)")
+    .select("id, campaign_id, campaign!inner(user_id)")
     .eq("id", entityId)
     .eq("campaign.user_id", userId)
     .maybeSingle();
   throwIfError(entityError, "Could not load entity");
   if (!entity) throw new Error("Could not move entity: entity does not exist");
+  await assertOwnedDestinationCategory(userId, categoryId, entity.campaign_id);
 
   const { error } = await getDatabase()
     .from("entity")
@@ -381,8 +510,8 @@ export async function moveEntity(userId, entityId, categoryId) {
 }
 
 export async function moveCategory(userId, categoryId, parentCategoryId) {
-  await getOwnedCategory(userId, categoryId);
-  await assertOwnedDestinationCategory(userId, parentCategoryId);
+  const category = await getOwnedCategory(userId, categoryId);
+  await assertOwnedDestinationCategory(userId, parentCategoryId, category.campaign_id);
   if (categoryId === parentCategoryId) {
     throw new Error("Could not move category: a category cannot contain itself");
   }
@@ -392,7 +521,7 @@ export async function moveCategory(userId, categoryId, parentCategoryId) {
     if (ancestorId === categoryId) {
       throw new Error("Could not move category: a category cannot move inside its descendant");
     }
-    const ancestor = await getOwnedCategory(userId, ancestorId);
+    const ancestor = await getOwnedCategory(userId, ancestorId, category.campaign_id);
     ancestorId = ancestor.parent_category_id;
   }
 
@@ -400,7 +529,7 @@ export async function moveCategory(userId, categoryId, parentCategoryId) {
     .from("category")
     .update({ parent_category_id: parentCategoryId || null })
     .eq("id", categoryId)
-    .eq("user_id", userId);
+    .eq("campaign_id", category.campaign_id);
   throwIfError(error, "Could not move category");
 }
 export const addEntityTextbox = (userId, entityId, name, content) =>
@@ -545,7 +674,7 @@ export async function deleteCategory(userId, categoryId, deleteContents = false)
     getDatabase()
       .from("category")
       .select("id")
-      .eq("user_id", userId)
+      .eq("campaign_id", category.campaign_id)
       .eq("parent_category_id", categoryId),
   ]);
   throwIfError(entitiesResult.error, "Could not load category entities");
@@ -567,6 +696,6 @@ export async function deleteCategory(userId, categoryId, deleteContents = false)
     .from("category")
     .delete()
     .eq("id", categoryId)
-    .eq("user_id", userId);
+    .eq("campaign_id", category.campaign_id);
   throwIfError(error, "Could not delete category");
 }

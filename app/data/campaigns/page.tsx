@@ -52,27 +52,32 @@ export default async function CampaignsPage() {
       >
         {owned.map((campaign) => (
           <article className="campaign-card campaign-manage-card" key={campaign.id}>
-            <Link
-              className="campaign-card-link"
-              href={`/data/campaign-lore?campaign=${campaign.id}`}
-            >
-              <strong>{campaign.name}</strong>
-              <span>Open campaign lore →</span>
-            </Link>
-            <Link className="campaign-manage-link" href={`/data/campaigns/${campaign.id}`}>
-              Manage campaign
-            </Link>
-            <div className="outgoing-invites">
-              <strong>Awaiting response</strong>
-              {campaign.pending_invites.length ? (
-                <ul>
-                  {campaign.pending_invites.map((invite) => (
-                    <li key={invite.id}>@{invite.username}</li>
-                  ))}
-                </ul>
-              ) : (
-                <span>No outstanding invitations</span>
-              )}
+            <h3>{campaign.name}</h3>
+            <div className="campaign-card-actions">
+              <Link
+                className="campaign-card-action campaign-open-lore"
+                href={`/data/campaign-lore?campaign=${campaign.id}`}
+              >
+                Open lore
+              </Link>
+              <Link
+                className="campaign-card-action campaign-manage-link"
+                href={`/data/campaigns/${campaign.id}`}
+              >
+                Manage campaign
+              </Link>
+              <div className="campaign-card-action outgoing-invites">
+                <strong>Outgoing invites</strong>
+                {campaign.pending_invites.length ? (
+                  <ul>
+                    {campaign.pending_invites.map((invite) => (
+                      <li key={invite.id}>@{invite.username}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span>No outstanding invitations</span>
+                )}
+              </div>
             </div>
           </article>
         ))}
@@ -96,7 +101,7 @@ export default async function CampaignsPage() {
           >
             <strong>{campaign.name}</strong>
             <span>GM: @{campaign.gm_username}</span>
-            <span>Open campaign lore →</span>
+            <span className="campaign-open-label">Open lore →</span>
           </Link>
         ))}
       </CampaignSection>

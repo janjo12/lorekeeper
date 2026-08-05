@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { changeEntityContentReveal, revealEntityContentToPlayers } from "@/app/data/actions";
 import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
+import { describeRevealAudience } from "@/app/data/campaign-lore/reveal-audience";
 
 type Player = { id: string; username: string };
 
@@ -27,22 +28,24 @@ export default function ContentRevealButton({
   const [allPlayers, setAllPlayers] = useState(revealedToAll);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const playerRevealTargets = players.filter((player) => player.id !== currentUserId);
-  const revealLabel = revealedToAll
-    ? "Revealed to all"
-    : revealedProfileIds.length
-      ? `Revealed to ${revealedProfileIds.length}`
-      : "Hidden";
+  const revealAudience = describeRevealAudience(players, revealedProfileIds, revealedToAll);
 
   if (!canChangeReveal && revealedToAll) return null;
 
   const action = canChangeReveal ? changeEntityContentReveal : revealEntityContentToPlayers;
 
   return (
-    <>
-      <button className="content-action" onClick={() => setOpen(true)} type="button">
+    <div className="reveal-control">
+      <button className="content-action reveal-button" onClick={() => setOpen(true)} type="button">
         {canChangeReveal ? "Change reveal" : "Reveal"}
-        {canChangeReveal && <span className="reveal-status">{revealLabel}</span>}
       </button>
+      <span className="reveal-audience">
+        {revealedToAll || revealedProfileIds.length ? (
+          <><strong>Revealed to </strong>{revealAudience}</>
+        ) : (
+          <strong>Hidden from all players</strong>
+        )}
+      </span>
       {open && (
         <div className="dialog-scrim" onMouseDown={() => setOpen(false)}>
           <section
@@ -148,6 +151,6 @@ export default function ContentRevealButton({
           </section>
         </div>
       )}
-    </>
+    </div>
   );
 }

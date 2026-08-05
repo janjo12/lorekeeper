@@ -4,6 +4,7 @@ import {
   getRevealedEntities,
   getVisibleCategories,
 } from "../app/data/campaign-lore/lore-visibility";
+import { describeRevealAudience } from "../app/data/campaign-lore/reveal-audience";
 
 describe("entity references", () => {
   const entities = [
@@ -76,5 +77,24 @@ describe("player lore visibility", () => {
     expect(
       getVisibleCategories(categories, [{ id: "entity", name: "Entity", category_id: "a" }]),
     ).toHaveLength(2);
+  });
+});
+
+describe("reveal audience labels", () => {
+  const players = [
+    { id: "1", username: "ada" },
+    { id: "2", username: "bea" },
+    { id: "3", username: "cy" },
+    { id: "4", username: "dee" },
+  ];
+
+  it("names up to three revealed players and summarizes the remainder", () => {
+    expect(describeRevealAudience(players, ["1", "2", "3", "4"], false)).toBe(
+      "@ada, @bea, @cy, plus 1 more",
+    );
+  });
+
+  it("uses an explicit all-player label", () => {
+    expect(describeRevealAudience(players, [], true)).toBe("all players");
   });
 });

@@ -32,6 +32,7 @@ describe("dataloader", () => {
     createClient.mockReset();
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SECRET_KEY = "test-secret-key";
+    process.env.AI_API_ENCRYPTION_SECRET = "test-ai-encryption-secret-at-least-32-characters";
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -227,24 +228,20 @@ describe("dataloader", () => {
     expect(rpc).toHaveBeenCalledWith("get_campaign_dashboard", { requesting_user_id: "user-1" });
   });
 
-  it("loads campaign categories from the campaign owner's category tree", async () => {
+  it("loads the visibility-filtered lightweight campaign index in one call", async () => {
     const lore = {
       campaign: { id: "campaign-1", user_id: "gm-1" },
       categories: [],
       entities: [],
     };
-    const categories = [{ id: "category-1", name: "People", parent_category_id: null }];
     const rpc = vi.fn().mockResolvedValue({ data: lore, error: null });
-    const categoryQuery = queryReturning({ data: categories, error: null });
-    const database = { rpc, from: vi.fn(() => categoryQuery) };
+    const database = { rpc, from: vi.fn() };
     createClient.mockReturnValue(database);
     const { getCampaignLore } = await loadDataloader();
 
-    await expect(getCampaignLore("campaign-1", "player-1")).resolves.toEqual({
-      ...lore,
-      categories,
-    });
-    expect(categoryQuery.eq).toHaveBeenCalledWith("user_id", "gm-1");
+    await expect(getCampaignLore("campaign-1", "player-1")).resolves.toEqual(lore);
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(database.from).not.toHaveBeenCalled();
   });
 
   it("can load reveal visibility without generating image URLs", async () => {
@@ -411,21 +408,44 @@ describe("dataloader", () => {
     });
   });
 
-  it("moves an owned entity to another owned category", async () => {
-    const destinationQuery = queryReturning({
-      data: { id: "category-2", parent_category_id: null },
+  it("creates categories inside an owned campaign", async () => {
+    const campaignQuery = queryReturning({ data: { id: "campaign-1" }, error: null });
+    const categoryQuery = queryReturning({
+      data: { id: "category-1", name: "People", parent_category_id: null },
       error: null,
     });
+    const database = {
+      from: vi.fn().mockReturnValueOnce(campaignQuery).mockReturnValueOnce(categoryQuery),
+    };
+    createClient.mockReturnValue(database);
+    const { createCategory } = await loadDataloader();
+
+    await createCategory("campaign-1", "gm-1", "People", null);
+
+    expect(campaignQuery.eq).toHaveBeenCalledWith("id", "campaign-1");
+    expect(campaignQuery.eq).toHaveBeenCalledWith("user_id", "gm-1");
+    expect(categoryQuery.insert).toHaveBeenCalledWith({
+      campaign_id: "campaign-1",
+      name: "People",
+      parent_category_id: null,
+    });
+  });
+
+  it("moves an owned entity to another owned category", async () => {
     const entityQuery = queryReturning({
-      data: { id: "entity-1", campaign: { user_id: "gm-1" } },
+      data: { id: "entity-1", campaign_id: "campaign-1", campaign: { user_id: "gm-1" } },
+      error: null,
+    });
+    const destinationQuery = queryReturning({
+      data: { id: "category-2", parent_category_id: null, campaign_id: "campaign-1" },
       error: null,
     });
     const updateQuery = queryReturning({ data: null, error: null });
     const database = {
       from: vi
         .fn()
-        .mockReturnValueOnce(destinationQuery)
         .mockReturnValueOnce(entityQuery)
+        .mockReturnValueOnce(destinationQuery)
         .mockReturnValueOnce(updateQuery),
     };
     createClient.mockReturnValue(database);
@@ -435,11 +455,12 @@ describe("dataloader", () => {
 
     expect(updateQuery.update).toHaveBeenCalledWith({ category_id: "category-2" });
     expect(updateQuery.eq).toHaveBeenCalledWith("id", "entity-1");
+    expect(destinationQuery.eq).toHaveBeenCalledWith("campaign_id", "campaign-1");
   });
 
   it("moves a category to the top level", async () => {
     const sourceQuery = queryReturning({
-      data: { id: "category-1", parent_category_id: "old-parent" },
+      data: { id: "category-1", parent_category_id: "old-parent", campaign_id: "campaign-1" },
       error: null,
     });
     const updateQuery = queryReturning({ data: null, error: null });
@@ -451,6 +472,7 @@ describe("dataloader", () => {
     await moveCategory("gm-1", "category-1", null);
 
     expect(updateQuery.update).toHaveBeenCalledWith({ parent_category_id: null });
+    expect(updateQuery.eq).toHaveBeenCalledWith("campaign_id", "campaign-1");
   });
 
   it("exposes entity content deletion as explicit textbox and image operations", async () => {
@@ -492,6 +514,56 @@ describe("dataloader", () => {
     expect(readQuery.select).toHaveBeenCalledWith("last_campaign_id, theme_setting");
     expect(updateQuery.update).toHaveBeenCalledWith({ theme_setting: "ember" });
     expect(updateQuery.eq).toHaveBeenCalledWith("id", "user-1");
+  });
+
+  it("encrypts AI API keys before storing them and can decrypt an owned key for future tasks", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "api-1", error: null });
+    const database = { rpc, from: vi.fn() };
+    createClient.mockReturnValue(database);
+    const { createAiApiForUser, getAiApiCredentialForTask } = await loadDataloader();
+
+    await createAiApiForUser("user-1", {
+      name: "Primary OpenAI",
+      provider: "OpenAI",
+      baseUrl: "",
+      apiKey: "sk-super-secret-1234",
+      makeDefault: false,
+    });
+
+    const stored = rpc.mock.calls[0][1].encrypted_key;
+    expect(stored).not.toContain("sk-super-secret-1234");
+    expect(stored).toMatch(/^v1\./);
+    expect(rpc).toHaveBeenCalledWith("create_profile_ai_api", expect.objectContaining({
+      requesting_user_id: "user-1",
+      key_suffix: "1234",
+      make_default: false,
+    }));
+
+    database.from.mockReturnValue(queryReturning({
+      data: {
+        id: "api-1",
+        name: "Primary OpenAI",
+        provider: "OpenAI",
+        base_url: null,
+        encrypted_api_key: stored,
+      },
+      error: null,
+    }));
+    await expect(getAiApiCredentialForTask("user-1", "api-1")).resolves.toMatchObject({
+      id: "api-1",
+      apiKey: "sk-super-secret-1234",
+    });
+  });
+
+  it("lists only masked AI API metadata for the profile page", async () => {
+    const api = { id: "api-1", name: "Claude", provider: "Anthropic", key_last_four: "abcd", is_default: true };
+    const query = queryReturning({ data: [api], error: null });
+    createClient.mockReturnValue({ from: vi.fn(() => query) });
+    const { getAiApisForUser } = await loadDataloader();
+
+    await expect(getAiApisForUser("user-1")).resolves.toEqual([api]);
+    expect(query.select).toHaveBeenCalledWith("id, name, provider, base_url, key_last_four, is_default, created_at");
+    expect(query.eq).toHaveBeenCalledWith("profile_id", "user-1");
   });
 
   it("surfaces database failures with their code and operation context", async () => {

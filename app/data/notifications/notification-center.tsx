@@ -7,6 +7,7 @@ import {
   parseRealtimeNotification,
   type RealtimeNotification,
 } from "./notification";
+import { ENTITY_COMMENT_EVENT, parseRealtimeEntityComment } from "./entity-comment-event";
 
 const TOKEN_REFRESH_INTERVAL = 45 * 60 * 1000;
 
@@ -20,7 +21,10 @@ export default function NotificationCenter({ userId }: { userId: string }) {
 
     async function authorizeAndSubscribe() {
       const response = await fetch("/api/realtime-token", { cache: "no-store" });
-      if (!response.ok || cancelled) return;
+      if (!response.ok || cancelled) {
+        if (!cancelled) console.error("Realtime authorization failed", response.status);
+        return;
+      }
       const data = (await response.json()) as {
         accessToken?: string;
         url?: string;
@@ -35,13 +39,32 @@ export default function NotificationCenter({ userId }: { userId: string }) {
 
       if (!channel) {
         channel = supabase
-          .channel(`user:${userId}:notifications`, { config: { private: true } })
+          .channel(`user:${userId}:notifications`, {
+            config: {
+              private: true,
+              broadcast: { replay: { since: Date.now() - 60_000, limit: 25 } },
+            },
+          })
           .on("broadcast", { event: "notification" }, ({ payload }) => {
             const notification = parseRealtimeNotification(payload);
             if (!notification) return;
-            setNotifications((current) => [notification, ...current].slice(0, 5));
+            setNotifications((current) =>
+              current.some((item) => item.id === notification.id)
+                ? current
+                : [notification, ...current].slice(0, 5),
+            );
           })
-          .subscribe();
+          .on("broadcast", { event: "entity_comment" }, ({ payload }) => {
+            const comment = parseRealtimeEntityComment(payload);
+            if (comment) {
+              window.dispatchEvent(new CustomEvent(ENTITY_COMMENT_EVENT, { detail: comment }));
+            }
+          })
+          .subscribe((status, error) => {
+            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+              console.error("Realtime subscription failed", status, error);
+            }
+          });
       }
     }
 

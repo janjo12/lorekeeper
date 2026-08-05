@@ -5,9 +5,9 @@ import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 import { FormField } from "@/app/components/ui";
 import ContentRevealButton from "@/app/data/campaign-lore/content-reveal-button";
 import EntityLinks, { type LinkableEntity } from "@/app/data/campaign-lore/entity-links";
+import EntityComments from "@/app/data/campaign-lore/entity-comments";
 import {
   attachEntityTag,
-  createEntityComment,
   editEntity,
   editEntityContent,
   removeEntity,
@@ -48,19 +48,11 @@ function ContentActions({
   type,
   name,
   value,
-  players,
-  revealedToAll,
-  revealedProfileIds,
-  currentUserId,
 }: {
   id: string;
   type: "textbox" | "image";
   name: string;
   value: string;
-  players: Player[];
-  revealedToAll: boolean;
-  revealedProfileIds: string[];
-  currentUserId: string;
 }) {
   return (
     <div className="content-actions">
@@ -92,15 +84,6 @@ function ContentActions({
           </div>
         </ActionForm>
       </details>
-      <ContentRevealButton
-        contentId={id}
-        contentType={type}
-        players={players}
-        revealedToAll={revealedToAll}
-        revealedProfileIds={revealedProfileIds}
-        canChangeReveal
-        currentUserId={currentUserId}
-      />
       <ActionForm
         action={removeEntityContent}
         errorMessage={`We couldn’t delete this ${type}. Please try again.`}
@@ -112,6 +95,69 @@ function ContentActions({
           itemName={type === "image" ? `the image “${name}”` : `the textbox “${name}”`}
         />
       </ActionForm>
+    </div>
+  );
+}
+
+function RevealIcon({ revealed }: { revealed: boolean }) {
+  return (
+    <span
+      className={`reveal-icon${revealed ? " is-revealed" : " is-hidden"}`}
+      title={revealed ? "Revealed" : "Hidden"}
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+        <circle cx="12" cy="12" r="2.75" />
+        {!revealed && <path d="m4 4 16 16" />}
+      </svg>
+    </span>
+  );
+}
+
+function ContentVisibilityHeading({
+  id,
+  type,
+  name,
+  campaignId,
+  entities,
+  players,
+  revealedToAll,
+  revealedProfileIds,
+  currentUserId,
+  isGm,
+}: {
+  id: string;
+  type: "textbox" | "image";
+  name: string;
+  campaignId: string;
+  entities: LinkableEntity[];
+  players: Player[];
+  revealedToAll: boolean;
+  revealedProfileIds: string[];
+  currentUserId: string;
+  isGm: boolean;
+}) {
+  const showVisibility = isGm || !revealedToAll;
+  const isRevealed = revealedToAll || revealedProfileIds.length > 0;
+  return (
+    <div className="content-heading-group">
+      <div className="content-heading-line">
+        {showVisibility && <RevealIcon revealed={isRevealed} />}
+        <h2>
+          <EntityLinks text={name} campaignId={campaignId} entities={entities} />
+        </h2>
+        {showVisibility && (
+          <ContentRevealButton
+            contentId={id}
+            contentType={type}
+            players={players}
+            revealedToAll={revealedToAll}
+            revealedProfileIds={revealedProfileIds}
+            canChangeReveal={isGm}
+            currentUserId={currentUserId}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -193,39 +239,30 @@ export default function EntityView({
       </header>
       <div className="entity-images">
         {data.images.map((item) => (
-          <figure key={item.id}>
+          <figure key={item.id} id={`image-${item.id}`}>
             <header className="content-card-header">
-              <h2>
-                <EntityLinks
-                  text={item.name || "Image"}
-                  campaignId={data.campaign.id}
-                  entities={linkableEntities}
-                />
-              </h2>
+              <ContentVisibilityHeading
+                id={item.id}
+                type="image"
+                name={item.name || "Image"}
+                campaignId={data.campaign.id}
+                entities={linkableEntities}
+                players={data.campaign_players}
+                revealedToAll={item.revealed_to_all}
+                revealedProfileIds={item.revealed_profile_ids}
+                currentUserId={currentUserId}
+                isGm={isGm}
+              />
               {isGm && (
                 <ContentActions
                   id={item.id}
                   type="image"
                   name={item.name || "Image"}
                   value=""
-                  players={data.campaign_players}
-                  revealedToAll={item.revealed_to_all}
-                  revealedProfileIds={item.revealed_profile_ids}
-                  currentUserId={currentUserId}
-                />
-              )}
-              {!isGm && !item.revealed_to_all && (
-                <ContentRevealButton
-                  contentId={item.id}
-                  contentType="image"
-                  players={data.campaign_players}
-                  revealedToAll={item.revealed_to_all}
-                  revealedProfileIds={item.revealed_profile_ids}
-                  canChangeReveal={false}
-                  currentUserId={currentUserId}
                 />
               )}
             </header>
+            <div className="entity-image-placeholder">
             {item.signed_url && (
               // Signed Storage URLs expire, so bypassing Next's persistent image
               // optimizer cache keeps the private URL lifecycle predictable.
@@ -237,41 +274,32 @@ export default function EntityView({
                 height={450}
               />
             )}
+            </div>
           </figure>
         ))}
       </div>
       <div className="entity-textboxes">
         {data.textboxes.map((box) => (
-          <article key={box.id}>
+          <article key={box.id} id={`textbox-${box.id}`}>
             <header className="content-card-header">
-              <h2>
-                <EntityLinks
-                  text={box.name || "Notes"}
-                  campaignId={data.campaign.id}
-                  entities={linkableEntities}
-                />
-              </h2>
+              <ContentVisibilityHeading
+                id={box.id}
+                type="textbox"
+                name={box.name || "Notes"}
+                campaignId={data.campaign.id}
+                entities={linkableEntities}
+                players={data.campaign_players}
+                revealedToAll={box.revealed_to_all}
+                revealedProfileIds={box.revealed_profile_ids}
+                currentUserId={currentUserId}
+                isGm={isGm}
+              />
               {isGm && (
                 <ContentActions
                   id={box.id}
                   type="textbox"
                   name={box.name || "Notes"}
                   value={box.textbox_content}
-                  players={data.campaign_players}
-                  revealedToAll={box.revealed_to_all}
-                  revealedProfileIds={box.revealed_profile_ids}
-                  currentUserId={currentUserId}
-                />
-              )}
-              {!isGm && !box.revealed_to_all && (
-                <ContentRevealButton
-                  contentId={box.id}
-                  contentType="textbox"
-                  players={data.campaign_players}
-                  revealedToAll={box.revealed_to_all}
-                  revealedProfileIds={box.revealed_profile_ids}
-                  canChangeReveal={false}
-                  currentUserId={currentUserId}
                 />
               )}
             </header>
@@ -319,28 +347,7 @@ export default function EntityView({
             </SubmitButton>
           </ActionForm>
         </div>
-        <div>
-          <h2>Comments</h2>
-          <ActionForm
-            action={createEntityComment}
-            className="comment-form"
-            errorMessage="We couldn’t post that comment. Please try again."
-          >
-            <input type="hidden" name="entityId" value={data.entity.id} />
-            <textarea name="content" placeholder="Add a comment" required rows={3} />
-            <SubmitButton variant="filled" pendingLabel="Posting…">
-              Comment
-            </SubmitButton>
-          </ActionForm>
-          <div className="comments">
-            {data.comments.map((comment) => (
-              <article key={comment.id}>
-                <strong>{comment.username}</strong>
-                <p>{comment.content}</p>
-              </article>
-            ))}
-          </div>
-        </div>
+        <EntityComments entityId={data.entity.id} initialComments={data.comments} />
       </section>
       <EntityCreationControls isGm={isGm} entityId={data.entity.id} />
     </section>

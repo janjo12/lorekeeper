@@ -1,18 +1,14 @@
 import SideCategories from "@/app/data/campaign-lore/side-categories";
 import { CampaignCreationControls } from "@/app/data/campaign-lore/creation-controls";
 import EntityView from "@/app/data/campaign-lore/entity-view";
+import LoreSearch from "@/app/data/campaign-lore/lore-search";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCampaignLore, getCampaignsForUser, getEntityView } from "@/app/dataloader";
 import { getSession } from "@/lib/session";
-import {
-  getRevealedEntities,
-  getVisibleCategories,
-  type LoreCategory,
-  type LoreEntity,
-  type RevealView,
-} from "@/app/data/campaign-lore/lore-visibility";
+import { type LoreCategory, type LoreEntity } from "@/app/data/campaign-lore/lore-visibility";
 import { EmptyState, PageHeader } from "@/app/components/ui";
+import { campaignLoreIndexHref } from "@/app/data/campaign-lore/lore-navigation";
 
 type AccessibleCampaign = { id: string; name: string; user_id: string };
 
@@ -34,18 +30,8 @@ export default async function CampaignLorePage({
   const allCategories = lore.categories as LoreCategory[];
   const campaignEntities = lore.entities as LoreEntity[];
   const isGm = lore.campaign.user_id === session.userId;
-  let visibleEntities = campaignEntities;
-
-  if (!isGm) {
-    const revealViews = (await Promise.all(
-      campaignEntities.map((entity) =>
-        getEntityView(entity.id, session.userId, { signImages: false }),
-      ),
-    )) as RevealView[];
-    visibleEntities = getRevealedEntities(campaignEntities, revealViews);
-  }
-
-  const categories = isGm ? allCategories : getVisibleCategories(allCategories, visibleEntities);
+  const visibleEntities = campaignEntities;
+  const categories = allCategories;
   const selectedCategory = categories.some((category) => category.id === params.category)
     ? params.category
     : undefined;
@@ -54,17 +40,30 @@ export default async function CampaignLorePage({
     : visibleEntities;
   if (params.entity) {
     const mayViewEntity = visibleEntities.some((entity) => entity.id === params.entity);
-    const entityData = mayViewEntity ? await getEntityView(params.entity, session.userId) : null;
-    if (entityData?.entity?.campaign_id === campaignId)
-      return (
+    if (!mayViewEntity) redirect(campaignLoreIndexHref(campaignId, selectedCategory));
+    const entityData = await getEntityView(params.entity, session.userId);
+    if (!entityData || entityData.entity?.campaign_id !== campaignId) {
+      redirect(campaignLoreIndexHref(campaignId, selectedCategory));
+    }
+    return (
+      <div className="lore-browser lore-entity-browser">
+        <SideCategories
+          campaignId={campaignId}
+          categories={categories}
+          selectedCategory={entityData.entity.category_id ?? undefined}
+          isGm={isGm}
+        />
         <EntityView
           data={entityData}
           categories={categories}
           currentUserId={session.userId}
           isGm={isGm}
-          linkableEntities={visibleEntities.filter((entity) => entity.id !== entityData.entity.id)}
+          linkableEntities={visibleEntities.filter(
+            (entity) => entity.id !== entityData.entity.id,
+          )}
         />
-      );
+      </div>
+    );
   }
 
   return (
@@ -76,6 +75,13 @@ export default async function CampaignLorePage({
         isGm={isGm}
       />
       <section className="data-panel lore-entities" id="all-lore">
+        <LoreSearch
+          campaignId={campaignId}
+          userId={session.userId}
+          entities={visibleEntities}
+          categories={categories}
+          manifest={lore.visibility_manifest ?? { textbox_ids: [], image_ids: [] }}
+        />
         <PageHeader
           eyebrow="Archive"
           title={lore.campaign.name}

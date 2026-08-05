@@ -156,6 +156,7 @@ export default function CreateFab({
                 errorMessage="We couldn’t create that category. Check the details and try again."
                 onSuccess={() => setMode(null)}
               >
+                <input type="hidden" name="campaignId" value={campaignId} />
                 <FormField label="Category name" variant="material">
                   <input ref={firstInput} name="name" required maxLength={80} />
                 </FormField>

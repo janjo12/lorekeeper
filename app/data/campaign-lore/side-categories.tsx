@@ -16,6 +16,14 @@ export default function SideCategories({
 }) {
   return (
     <aside className="category-sidebar" aria-label="Lore categories">
+      {isGm && (
+        <Link
+          className="manage-campaign-link"
+          href={`/data/campaigns/${campaignId}`}
+        >
+          Manage campaign
+        </Link>
+      )}
       <Link
         className={`category-link${!selectedCategory ? " is-active" : ""}`}
         href={`/data/campaign-lore?campaign=${campaignId}`}

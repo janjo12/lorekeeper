@@ -85,6 +85,11 @@ describe("theme contrast", () => {
     ).toBeGreaterThanOrEqual(7);
   });
 
+  it.each(themeIds)("%s does not gray secondary text", (theme) => {
+    const palette = paletteFor(theme);
+    expect(palette["muted-text"]).toBe(palette["shell-text"]);
+  });
+
   it.each(themeIds)("%s keeps controls and navigation at AAA contrast", (theme) => {
     const palette = paletteFor(theme);
 

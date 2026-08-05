@@ -64,8 +64,17 @@ describe("campaign invitation dashboard", () => {
   });
 
   it("shows outgoing pending invitations on owned campaign cards", () => {
-    expect(page).toContain("Awaiting response");
+    expect(page).toContain("Outgoing invites");
     expect(page).toContain("campaign.pending_invites");
+  });
+
+  it("places the campaign title above three distinct peer action surfaces", () => {
+    expect(page.indexOf("<h3>{campaign.name}</h3>")).toBeLessThan(
+      page.indexOf('className="campaign-card-actions"'),
+    );
+    expect(page).toContain('className="campaign-card-action campaign-open-lore"');
+    expect(page).toContain('className="campaign-card-action campaign-manage-link"');
+    expect(page).toContain('className="campaign-card-action outgoing-invites"');
   });
 
   it("normalizes legacy and partial dashboard payloads before rendering", () => {

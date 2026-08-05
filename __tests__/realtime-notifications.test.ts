@@ -8,11 +8,18 @@ function source(path: string) {
 
 describe("Realtime notification broadcasts", () => {
   const migration = source("../supabase/migrations/20260729020000_add_realtime_notifications.sql");
+  const repair = source("../supabase/migrations/20260803030000_repair_realtime_comments_and_notifications.sql");
 
   it("authorizes only the signed-in user's private notification topic", () => {
     expect(migration).toContain(
       "realtime.topic() = 'user:' || auth.uid()::text || ':notifications'",
     );
+  });
+
+  it("gives replayed notifications stable IDs and broadcasts new comments", () => {
+    expect(repair).toContain("'id', gen_random_uuid()");
+    expect(repair).toContain("broadcast_entity_comment_trigger");
+    expect(repair).toContain("'entity_comment'");
   });
 
   it("broadcasts campaign invitations to the invited player", () => {
@@ -34,10 +41,12 @@ describe("Realtime notification client", () => {
   const center = source("../app/data/notifications/notification-center.tsx");
   const tokenRoute = source("../app/api/realtime-token/route.ts");
 
-  it("uses an authenticated private channel without replay", () => {
+  it("uses an authenticated private channel with a short replay window", () => {
     expect(center).toContain("realtime.setAuth(data.accessToken)");
-    expect(center).toContain("config: { private: true }");
-    expect(center).not.toContain("replay:");
+    expect(center).toContain("private: true");
+    expect(center).toContain("replay: { since: Date.now() - 60_000, limit: 25 }");
+    expect(center).toContain('event: "entity_comment"');
+    expect(center).toContain('status === "CHANNEL_ERROR" || status === "TIMED_OUT"');
   });
 
   it("returns only a publishable key to the browser", () => {
@@ -58,6 +67,16 @@ describe("Realtime notification client", () => {
       kind: "lore_reveal",
       href: "/data/campaign-lore?campaign=one&entity=two",
     });
+  });
+
+  it("preserves database event IDs for replay deduplication", () => {
+    expect(parseRealtimeNotification({
+      id: "event-1",
+      kind: "campaign_invite",
+      title: "Invite",
+      body: "Join",
+      href: "/data/campaigns",
+    })?.id).toBe("event-1");
   });
 
   it("rejects malformed or external notification destinations", () => {

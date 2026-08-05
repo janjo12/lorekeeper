@@ -124,10 +124,11 @@ export async function addLoreEntity(formData: FormData) {
 export async function addCategory(formData: FormData) {
   const session = await getSession();
   if (!session) redirect("/auth/login");
+  const campaignId = formData.get("campaignId")?.toString();
   const name = formData.get("name")?.toString().trim();
   const parentCategoryId = formData.get("parentCategoryId")?.toString();
-  if (!name) return;
-  await createCategory(session.userId, name.slice(0, 80), parentCategoryId);
+  if (!campaignId || !name) return;
+  await createCategory(campaignId, session.userId, name.slice(0, 80), parentCategoryId);
   revalidatePath("/data/campaign-lore");
 }
 

@@ -20,7 +20,7 @@ export function parseRealtimeNotification(payload: unknown): RealtimeNotificatio
   }
 
   return {
-    id: crypto.randomUUID(),
+    id: typeof value.id === "string" ? value.id : crypto.randomUUID(),
     kind: value.kind,
     title: value.title,
     body: value.body,

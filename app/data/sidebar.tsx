@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const navigationItems = [
   { label: "Campaigns", href: "/data/campaigns", icon: "campaigns" },
@@ -54,9 +54,23 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    function closeWhenClickingOutside(event: PointerEvent) {
+      if (!sidebarRef.current?.contains(event.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeWhenClickingOutside);
+    return () => document.removeEventListener("pointerdown", closeWhenClickingOutside);
+  }, [mobileMenuOpen]);
 
   return (
-    <aside className={`lore-sidebar${mobileMenuOpen ? " is-mobile-open" : ""}`}>
+    <aside ref={sidebarRef} className={`lore-sidebar${mobileMenuOpen ? " is-mobile-open" : ""}`}>
       <div className="mobile-nav-bar">
         <button
           className="mobile-menu-button"
