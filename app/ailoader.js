@@ -1,12 +1,17 @@
 const CONNECTION_TEST_PROMPT =
   "Confirm this AI connection works in one sentence, then give one concise, practical tip for organizing a fantasy lore archive.";
 const TEXT_REQUEST_TIMEOUT_MS = 2 * 60_000;
+const CONNECTION_TEST_TIMEOUT_MS = 5 * 60_000;
 const IMAGE_REQUEST_TIMEOUT_MS = 10 * 60_000;
 
 function requestTimeout(purpose) {
-  return purpose === "generate-image"
-    ? { milliseconds: IMAGE_REQUEST_TIMEOUT_MS, label: "10 minutes" }
-    : { milliseconds: TEXT_REQUEST_TIMEOUT_MS, label: "2 minutes" };
+  if (purpose === "generate-image") {
+    return { milliseconds: IMAGE_REQUEST_TIMEOUT_MS, label: "10 minutes" };
+  }
+  if (purpose === "connection-test") {
+    return { milliseconds: CONNECTION_TEST_TIMEOUT_MS, label: "5 minutes" };
+  }
+  return { milliseconds: TEXT_REQUEST_TIMEOUT_MS, label: "2 minutes" };
 }
 
 function normalizeProvider(provider) {

@@ -35,8 +35,10 @@ describe("AI provider boundary", () => {
 
   it("allows slower local models more time, with extra time for image generation", () => {
     expect(aiLoader).toContain("const TEXT_REQUEST_TIMEOUT_MS = 2 * 60_000");
+    expect(aiLoader).toContain("const CONNECTION_TEST_TIMEOUT_MS = 5 * 60_000");
     expect(aiLoader).toContain("const IMAGE_REQUEST_TIMEOUT_MS = 10 * 60_000");
     expect(aiLoader).toContain('purpose === "generate-image"');
+    expect(aiLoader).toContain('purpose === "connection-test"');
     expect(aiLoader).toContain("signal: AbortSignal.timeout(timeout.milliseconds)");
     expect(aiLoader).toContain("purpose,\n    sessionId:");
   });
