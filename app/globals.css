@@ -1141,18 +1141,20 @@ input {
 .category-row .category-link {
   flex: 1;
 }
-.category-actions > summary {
+.category-actions-trigger {
   padding: 0.4rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
-  list-style: none;
 }
 .category-actions-panel {
-  position: absolute;
-  z-index: 20;
-  left: 1rem;
+  position: fixed;
+  z-index: 250;
   display: grid;
   gap: 1rem;
-  width: min(24rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 0.7rem;

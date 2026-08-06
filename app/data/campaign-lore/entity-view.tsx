@@ -6,6 +6,7 @@ import { FormField } from "@/app/components/ui";
 import ContentRevealButton from "@/app/data/campaign-lore/content-reveal-button";
 import EntityLinks, { type LinkableEntity } from "@/app/data/campaign-lore/entity-links";
 import EntityComments from "@/app/data/campaign-lore/entity-comments";
+import DismissibleDetails from "@/app/components/dismissible-details";
 import {
   attachEntityTag,
   editEntity,
@@ -56,7 +57,7 @@ function ContentActions({
 }) {
   return (
     <div className="content-actions">
-      <details className="content-edit">
+      <DismissibleDetails className="content-edit">
         <summary>Edit</summary>
         <ActionForm
           action={editEntityContent}
@@ -83,7 +84,7 @@ function ContentActions({
             </SubmitButton>
           </div>
         </ActionForm>
-      </details>
+      </DismissibleDetails>
       <ActionForm
         action={removeEntityContent}
         errorMessage={`We couldn’t delete this ${type}. Please try again.`}
@@ -195,7 +196,7 @@ export default function EntityView({
         </div>
         {isGm && (
           <div className="entity-header-actions">
-            <details className="edit-details">
+            <DismissibleDetails className="edit-details">
               <summary className="secondary-button">Edit entity</summary>
               <ActionForm
                 action={editEntity}
@@ -220,7 +221,7 @@ export default function EntityView({
                   Save
                 </SubmitButton>
               </ActionForm>
-            </details>
+            </DismissibleDetails>
             <ActionForm
               action={removeEntity}
               errorMessage="We couldn’t delete this entity. Please try again."

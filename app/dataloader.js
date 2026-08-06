@@ -114,9 +114,8 @@ export async function loginUser(email, password) {
   return { ...profile, accessToken: auth.accessToken, refreshToken: auth.refreshToken };
 }
 
-export async function refreshAuthSession(accessToken, refreshToken) {
-  const { data, error } = await createAuthClient().auth.setSession({
-    access_token: accessToken,
+export async function refreshAuthSession(refreshToken) {
+  const { data, error } = await createAuthClient().auth.refreshSession({
     refresh_token: refreshToken,
   });
   throwIfError(error, "Could not refresh Realtime authentication");

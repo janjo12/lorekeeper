@@ -19,7 +19,7 @@ export async function GET() {
   }
 
   try {
-    const refreshed = await refreshAuthSession(tokens.accessToken, tokens.refreshToken);
+    const refreshed = await refreshAuthSession(tokens.refreshToken);
     await setSupabaseAuthTokens(refreshed);
     return Response.json(
       { accessToken: refreshed.accessToken, url, publishableKey },

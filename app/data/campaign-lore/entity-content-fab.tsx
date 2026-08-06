@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { createEntityImage, createEntityTextbox } from "@/app/data/actions";
 import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 import { Button, DialogActions, FormField } from "@/app/components/ui";
+import { useDismissOnOutside } from "@/app/components/use-dismiss-on-outside";
 
 type Mode = "textbox" | "image" | null;
 
 export default function EntityContentFab({ entityId }: { entityId: string }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
+  const closeContentMenu = useCallback(() => setOpen(false), []);
+  const speedDialRef = useDismissOnOutside<HTMLDivElement>(open, closeContentMenu);
   return (
     <>
-      <div className={`create-speed-dial${open ? " is-open" : ""}`}>
+      <div className={`create-speed-dial${open ? " is-open" : ""}`} ref={speedDialRef}>
         <div className="fab-actions" aria-hidden={!open}>
           <button
             className="fab-action"

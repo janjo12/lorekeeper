@@ -138,7 +138,7 @@ describe("dataloader", () => {
   it("refreshes the Supabase session used by Realtime", async () => {
     const authClient = {
       auth: {
-        setSession: vi.fn().mockResolvedValue({
+        refreshSession: vi.fn().mockResolvedValue({
           data: {
             session: { access_token: "new-access", refresh_token: "new-refresh" },
           },
@@ -149,12 +149,11 @@ describe("dataloader", () => {
     createClient.mockReturnValue(authClient);
     const { refreshAuthSession } = await loadDataloader();
 
-    await expect(refreshAuthSession("old-access", "old-refresh")).resolves.toEqual({
+    await expect(refreshAuthSession("old-refresh")).resolves.toEqual({
       accessToken: "new-access",
       refreshToken: "new-refresh",
     });
-    expect(authClient.auth.setSession).toHaveBeenCalledWith({
-      access_token: "old-access",
+    expect(authClient.auth.refreshSession).toHaveBeenCalledWith({
       refresh_token: "old-refresh",
     });
   });

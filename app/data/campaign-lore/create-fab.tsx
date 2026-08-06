@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { addCategory, addLoreEntity } from "@/app/data/actions";
 import { Button, DialogActions, FormField } from "@/app/components/ui";
 import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
+import { useDismissOnOutside } from "@/app/components/use-dismiss-on-outside";
 
 type Category = { id: string; name: string };
 type CreationMode = "entity" | "category" | null;
@@ -46,6 +47,8 @@ export default function CreateFab({
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<CreationMode>(null);
   const firstInput = useRef<HTMLInputElement>(null);
+  const closeCreationMenu = useCallback(() => setExpanded(false), []);
+  const speedDialRef = useDismissOnOutside<HTMLDivElement>(expanded, closeCreationMenu);
 
   useEffect(() => {
     if (mode) firstInput.current?.focus();
@@ -69,7 +72,7 @@ export default function CreateFab({
 
   return (
     <>
-      <div className={`create-speed-dial${expanded ? " is-open" : ""}`}>
+      <div className={`create-speed-dial${expanded ? " is-open" : ""}`} ref={speedDialRef}>
         <div className="fab-actions" aria-hidden={!expanded}>
           <button
             className="fab-action"

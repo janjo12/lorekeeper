@@ -26,6 +26,11 @@ type SupabaseAuthTokens = {
   refreshToken: string;
 };
 
+type StoredSupabaseAuthTokens = {
+  accessToken?: string;
+  refreshToken: string;
+};
+
 const authCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -75,11 +80,15 @@ export async function deleteSession() {
   cookieStore.delete(SUPABASE_REFRESH_COOKIE);
 }
 
-export async function getSupabaseAuthTokens(): Promise<SupabaseAuthTokens | null> {
+export async function getSupabaseAuthTokens(): Promise<StoredSupabaseAuthTokens | null> {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value;
   const refreshToken = cookieStore.get(SUPABASE_REFRESH_COOKIE)?.value;
-  return accessToken && refreshToken ? { accessToken, refreshToken } : null;
+  // Supabase access tokens expire before the seven-day Lorekeeper session.
+  // The refresh token is sufficient to renew the pair, so do not reject an
+  // otherwise recoverable session just because its access cookie expired.
+  if (!refreshToken) return null;
+  return accessToken ? { accessToken, refreshToken } : { refreshToken };
 }
 
 export async function setSupabaseAuthTokens(tokens: SupabaseAuthTokens) {
