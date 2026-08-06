@@ -33,6 +33,13 @@ describe("AI provider boundary", () => {
     expect(aiLoader).toContain("practical tip for organizing a fantasy lore archive");
   });
 
+  it("supports deployed HTTPS pages connecting directly to local AnythingLLM", () => {
+    expect(aiLoader).toContain('new Set(["localhost", "127.0.0.1", "::1"])');
+    expect(aiLoader).toContain('targetAddressSpace: "local"');
+    expect(aiLoader).toContain('mode: "cors"');
+    expect(aiLoader).toContain("Local Network Access permission");
+  });
+
   it("allows slower local models more time, with extra time for image generation", () => {
     expect(aiLoader).toContain("const TEXT_REQUEST_TIMEOUT_MS = 2 * 60_000");
     expect(aiLoader).toContain("const CONNECTION_TEST_TIMEOUT_MS = 5 * 60_000");

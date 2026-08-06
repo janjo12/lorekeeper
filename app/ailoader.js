@@ -63,10 +63,13 @@ async function readJson(response) {
 
 async function callAnythingLlm({ apiKey, baseUrl, prompt, purpose, sessionId }) {
   const timeout = requestTimeout(purpose);
+  const chatUrl = anythingLlmChatUrl(baseUrl);
+  const isLoopback = new Set(["localhost", "127.0.0.1", "::1"]).has(chatUrl.hostname);
   let response;
   try {
-    response = await fetch(anythingLlmChatUrl(baseUrl), {
+    response = await fetch(chatUrl, {
       method: "POST",
+      mode: "cors",
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -75,10 +78,16 @@ async function callAnythingLlm({ apiKey, baseUrl, prompt, purpose, sessionId }) 
       body: JSON.stringify({ message: prompt, mode: "chat", sessionId }),
       cache: "no-store",
       signal: AbortSignal.timeout(timeout.milliseconds),
+      ...(isLoopback ? { targetAddressSpace: "local" } : {}),
     });
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
       throw new Error(`The AnythingLLM request timed out after ${timeout.label}.`);
+    }
+    if (isLoopback && globalThis.location?.protocol === "https:") {
+      throw new Error(
+        "The deployed site could not reach AnythingLLM on this computer. Allow this site’s Local Network Access permission, keep AnythingLLM running, and allow this site’s exact HTTPS origin in AnythingLLM CORS settings.",
+      );
     }
     throw new Error(
       "The browser could not reach AnythingLLM. Confirm it is running, the URL is correct, and AnythingLLM allows requests from this site (CORS).",
