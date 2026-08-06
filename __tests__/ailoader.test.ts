@@ -37,7 +37,8 @@ describe("AI provider boundary", () => {
     expect(aiLoader).toContain('new Set(["localhost", "127.0.0.1", "::1"])');
     expect(aiLoader).toContain('targetAddressSpace: "local"');
     expect(aiLoader).toContain('mode: "cors"');
-    expect(aiLoader).toContain("Local Network Access permission");
+    expect(aiLoader).toContain("set Local network access to Allow");
+    expect(manager).toContain("change it in the site");
   });
 
   it("allows slower local models more time, with extra time for image generation", () => {

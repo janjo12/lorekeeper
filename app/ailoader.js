@@ -86,7 +86,7 @@ async function callAnythingLlm({ apiKey, baseUrl, prompt, purpose, sessionId }) 
     }
     if (isLoopback && globalThis.location?.protocol === "https:") {
       throw new Error(
-        "The deployed site could not reach AnythingLLM on this computer. Allow this site’s Local Network Access permission, keep AnythingLLM running, and allow this site’s exact HTTPS origin in AnythingLLM CORS settings.",
+        "Chrome or Edge blocked access to local AnythingLLM, or AnythingLLM is not running. Open this site’s controls beside the address bar, set Local network access to Allow, reload the page, and confirm http://localhost:3001 opens in this same browser.",
       );
     }
     throw new Error(

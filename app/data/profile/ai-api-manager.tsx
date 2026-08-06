@@ -216,6 +216,11 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
         )}
         <FormMessage success={state.success}>{state.message}</FormMessage>
         <div className="ai-api-connection-test">
+          <p className="field-help">
+            For a localhost URL on the deployed site, use Chrome or Edge and allow Local network
+            access when the browser asks. If it was previously blocked, change it in the site
+            controls beside the address bar, then reload.
+          </p>
           <button
             className="secondary-button"
             disabled={testing}
