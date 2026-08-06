@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import {
   createAiApiForUser,
+  changeUserPassword,
   deleteAiApiForUser,
   setDefaultAiApiForUser,
   updateProfileUsername,
@@ -44,6 +45,68 @@ export async function updateUsername(
       return { message: "That username is already taken." };
     }
     return { message: "We could not update your username." };
+  }
+}
+
+export type PasswordState = {
+  errors?: Partial<Record<"currentPassword" | "newPassword" | "confirmPassword", string[]>>;
+  message?: string;
+  success?: boolean;
+};
+
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password.").max(72),
+    newPassword: z
+      .string()
+      .min(8, "New password must be at least 8 characters.")
+      .max(72, "New password must be 72 characters or fewer."),
+    confirmPassword: z.string(),
+  })
+  .superRefine((values, context) => {
+    if (values.newPassword !== values.confirmPassword) {
+      context.addIssue({
+        code: "custom",
+        path: ["confirmPassword"],
+        message: "Passwords do not match.",
+      });
+    }
+    if (values.currentPassword === values.newPassword) {
+      context.addIssue({
+        code: "custom",
+        path: ["newPassword"],
+        message: "Choose a password different from your current password.",
+      });
+    }
+  });
+
+export async function updatePassword(
+  _state: PasswordState,
+  formData: FormData,
+): Promise<PasswordState> {
+  const session = await getSession();
+  if (!session) return { message: "Your session has expired. Sign in again." };
+  const parsed = passwordSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) return { errors: z.flattenError(parsed.error).fieldErrors };
+
+  try {
+    const tokens = await changeUserPassword(
+      session.userId,
+      session.email,
+      parsed.data.currentPassword,
+      parsed.data.newPassword,
+    );
+    await createSession(session, tokens);
+    return { success: true, message: "Password updated." };
+  } catch (error) {
+    if (error instanceof Error && /invalid email or password|invalid login credentials|current password/i.test(error.message)) {
+      return { message: "Your current password is incorrect." };
+    }
+    return { message: "We could not update your password." };
   }
 }
 

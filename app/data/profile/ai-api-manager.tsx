@@ -5,6 +5,7 @@ import { ActionForm, FormMessage, SubmitButton } from "@/app/components/form-fee
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
 import { FormField } from "@/app/components/ui";
 import { addAiApi, chooseDefaultAiApi, removeAiApi } from "@/app/data/profile/actions";
+import { testAiApiConnection } from "@/app/ailoader";
 
 export type AiApiSummary = {
   id: string;
@@ -15,7 +16,21 @@ export type AiApiSummary = {
   is_default: boolean;
 };
 
-const providers = ["OpenAI", "Anthropic", "Google AI", "xAI", "OpenRouter", "Custom"];
+function AiApiConnectionTest({ apiId }: { apiId: string }) {
+  const [state, action, pending] = useActionState(testAiApiConnection, { message: "" });
+  return (
+    <div className="ai-api-connection-test">
+      <form action={action}>
+        <input type="hidden" name="apiId" value={apiId} />
+        <SubmitButton disabled={pending} variant="secondary" pendingLabel="Testing…">
+          Test connection
+        </SubmitButton>
+      </form>
+      <FormMessage success={state.success}>{state.message}</FormMessage>
+      {state.response && <blockquote>{state.response}</blockquote>}
+    </div>
+  );
+}
 
 export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
   const [state, action, pending] = useActionState(addAiApi, {});
@@ -44,19 +59,30 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
                   <h3>{api.name}</h3>
                   {api.is_default && <span className="default-badge">Default</span>}
                 </div>
-                <p>{api.provider} · Key ending in {api.key_last_four}</p>
+                <p>
+                  {api.provider} · Key ending in {api.key_last_four}
+                </p>
                 {api.base_url && <small>{api.base_url}</small>}
               </div>
               <div className="ai-api-actions">
+                <AiApiConnectionTest apiId={api.id} />
                 {!api.is_default && (
-                  <ActionForm action={chooseDefaultAiApi} errorMessage="We couldn’t change your default API.">
+                  <ActionForm
+                    action={chooseDefaultAiApi}
+                    errorMessage="We couldn’t change your default API."
+                  >
                     <input type="hidden" name="apiId" value={api.id} />
-                    <SubmitButton variant="secondary" pendingLabel="Changing…">Make default</SubmitButton>
+                    <SubmitButton variant="secondary" pendingLabel="Changing…">
+                      Make default
+                    </SubmitButton>
                   </ActionForm>
                 )}
                 <ActionForm action={removeAiApi} errorMessage="We couldn’t remove that API.">
                   <input type="hidden" name="apiId" value={api.id} />
-                  <ConfirmDeleteButton className="secondary-button is-danger" itemName={`the AI API “${api.name}”`}>
+                  <ConfirmDeleteButton
+                    className="secondary-button is-danger"
+                    itemName={`the AI API “${api.name}”`}
+                  >
                     Remove
                   </ConfirmDeleteButton>
                 </ActionForm>
@@ -69,19 +95,41 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
       <form ref={formRef} action={action} className="ai-api-form">
         <h3>Add an AI API</h3>
         <FormField label="Name" htmlFor="ai-api-name" errors={state.errors?.name}>
-          <input id="ai-api-name" name="name" placeholder="My OpenAI account" required maxLength={80} />
+          <input
+            id="ai-api-name"
+            name="name"
+            placeholder="My AnythingLLM workspace"
+            required
+            maxLength={80}
+          />
         </FormField>
         <FormField label="Provider" htmlFor="ai-api-provider" errors={state.errors?.provider}>
-          <select id="ai-api-provider" name="provider" required defaultValue="">
-            <option value="" disabled>Choose a provider</option>
-            {providers.map((provider) => <option key={provider}>{provider}</option>)}
+          <select id="ai-api-provider" name="provider" required defaultValue="AnythingLLM">
+            <option value="AnythingLLM">AnythingLLM</option>
           </select>
         </FormField>
-        <FormField label="Base URL (optional)" htmlFor="ai-api-base-url" errors={state.errors?.baseUrl}>
-          <input id="ai-api-base-url" name="baseUrl" type="url" placeholder="https://api.example.com/v1" maxLength={500} />
+        <FormField
+          label="Base URL (optional)"
+          htmlFor="ai-api-base-url"
+          errors={state.errors?.baseUrl}
+        >
+          <input
+            id="ai-api-base-url"
+            name="baseUrl"
+            type="url"
+            placeholder="http://localhost:3001/api/v1/workspace/lorekeeper/chat"
+            maxLength={500}
+          />
         </FormField>
         <FormField label="API key" htmlFor="ai-api-key" errors={state.errors?.apiKey}>
-          <input id="ai-api-key" name="apiKey" type="password" autoComplete="new-password" required maxLength={500} />
+          <input
+            id="ai-api-key"
+            name="apiKey"
+            type="password"
+            autoComplete="new-password"
+            required
+            maxLength={500}
+          />
         </FormField>
         {apis.length > 0 && (
           <label className="checkbox-field">
@@ -89,9 +137,13 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
             Make this my default API
           </label>
         )}
-        {apis.length === 0 && <p className="field-help">Your first API automatically becomes the default.</p>}
+        {apis.length === 0 && (
+          <p className="field-help">Your first API automatically becomes the default.</p>
+        )}
         <FormMessage success={state.success}>{state.message}</FormMessage>
-        <SubmitButton disabled={pending} pendingLabel="Encrypting and saving…">Add API</SubmitButton>
+        <SubmitButton disabled={pending} pendingLabel="Encrypting and saving…">
+          Add API
+        </SubmitButton>
       </form>
     </section>
   );

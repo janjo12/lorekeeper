@@ -126,6 +126,23 @@ export async function refreshAuthSession(refreshToken) {
   };
 }
 
+export async function changeUserPassword(userId, email, currentPassword, newPassword) {
+  const verified = await signInForSession(email, currentPassword);
+  if (verified.authUserId !== userId) {
+    throw new Error("Current password verification did not match this account");
+  }
+
+  const { error } = await getDatabase().auth.admin.updateUserById(userId, {
+    password: newPassword,
+  });
+  throwIfError(error, "Could not update password");
+
+  // Password updates can invalidate existing Supabase sessions. Sign in with
+  // the new password so Auth and Realtime cookies stay synchronized.
+  const refreshed = await signInForSession(email, newPassword);
+  return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken };
+}
+
 export async function updateProfileUsername(userId, username) {
   const { data, error } = await getDatabase()
     .from("profile")

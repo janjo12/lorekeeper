@@ -5,8 +5,9 @@ import { addCategory, addLoreEntity } from "@/app/data/actions";
 import { Button, DialogActions, FormField } from "@/app/components/ui";
 import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 import { useDismissOnOutside } from "@/app/components/use-dismiss-on-outside";
+import CategoryTreePicker from "@/app/data/campaign-lore/category-tree-picker";
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; parent_category_id?: string | null };
 type CreationMode = "entity" | "category" | null;
 
 function PlusIcon({ close = false }: { close?: boolean }) {
@@ -40,9 +41,11 @@ function CategoryIcon() {
 export default function CreateFab({
   campaignId,
   categories,
+  selectedCategory,
 }: {
   campaignId: string;
   categories: Category[];
+  selectedCategory?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<CreationMode>(null);
@@ -134,14 +137,12 @@ export default function CreateFab({
                   <input ref={firstInput} name="name" required maxLength={80} />
                 </FormField>
                 <FormField label="Category" variant="material">
-                  <select name="categoryId">
-                    <option value="">No category</option>
-                    {categories.map((category) => (
-                      <option value={category.id} key={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                  <CategoryTreePicker
+                    categories={categories}
+                    defaultValue={selectedCategory}
+                    name="categoryId"
+                    topLevelLabel="No category"
+                  />
                 </FormField>
                 <DialogActions>
                   <Button variant="text" onClick={() => setMode(null)}>
@@ -164,14 +165,12 @@ export default function CreateFab({
                   <input ref={firstInput} name="name" required maxLength={80} />
                 </FormField>
                 <FormField label="Parent category" variant="material">
-                  <select name="parentCategoryId">
-                    <option value="">Top-level category</option>
-                    {categories.map((category) => (
-                      <option value={category.id} key={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                  <CategoryTreePicker
+                    categories={categories}
+                    defaultValue={selectedCategory}
+                    name="parentCategoryId"
+                    topLevelLabel="Top-level category"
+                  />
                 </FormField>
                 <DialogActions>
                   <Button variant="text" onClick={() => setMode(null)}>

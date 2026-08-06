@@ -158,6 +158,79 @@ describe("dataloader", () => {
     });
   });
 
+  it("verifies the current password before changing it and returns a fresh session", async () => {
+    const oldPasswordAuth = {
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: {
+            user: { id: "user-1" },
+            session: { access_token: "verified-access", refresh_token: "verified-refresh" },
+          },
+          error: null,
+        }),
+      },
+    };
+    const database = {
+      auth: {
+        admin: {
+          updateUserById: vi.fn().mockResolvedValue({ data: {}, error: null }),
+        },
+      },
+    };
+    const newPasswordAuth = {
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: {
+            user: { id: "user-1" },
+            session: { access_token: "new-access", refresh_token: "new-refresh" },
+          },
+          error: null,
+        }),
+      },
+    };
+    createClient
+      .mockReturnValueOnce(oldPasswordAuth)
+      .mockReturnValueOnce(database)
+      .mockReturnValueOnce(newPasswordAuth);
+    const { changeUserPassword } = await loadDataloader();
+
+    await expect(
+      changeUserPassword("user-1", "keeper@example.com", "old-password", "new-password"),
+    ).resolves.toEqual({ accessToken: "new-access", refreshToken: "new-refresh" });
+    expect(oldPasswordAuth.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "keeper@example.com",
+      password: "old-password",
+    });
+    expect(database.auth.admin.updateUserById).toHaveBeenCalledWith("user-1", {
+      password: "new-password",
+    });
+    expect(newPasswordAuth.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "keeper@example.com",
+      password: "new-password",
+    });
+  });
+
+  it("does not change a password when the verified Auth identity differs from the session", async () => {
+    const authClient = {
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: {
+            user: { id: "different-user" },
+            session: { access_token: "access", refresh_token: "refresh" },
+          },
+          error: null,
+        }),
+      },
+    };
+    createClient.mockReturnValue(authClient);
+    const { changeUserPassword } = await loadDataloader();
+
+    await expect(
+      changeUserPassword("user-1", "keeper@example.com", "current-password", "new-password"),
+    ).rejects.toThrow("did not match this account");
+    expect(createClient).toHaveBeenCalledOnce();
+  });
+
   it("surfaces a duplicate email instead of replacing its profile", async () => {
     const database = {
       auth: {

@@ -48,6 +48,7 @@ export default async function CampaignLorePage({
     return (
       <div className="lore-browser lore-entity-browser">
         <SideCategories
+          key={entityData.entity.category_id ?? "all"}
           campaignId={campaignId}
           categories={categories}
           selectedCategory={entityData.entity.category_id ?? undefined}
@@ -58,9 +59,7 @@ export default async function CampaignLorePage({
           categories={categories}
           currentUserId={session.userId}
           isGm={isGm}
-          linkableEntities={visibleEntities.filter(
-            (entity) => entity.id !== entityData.entity.id,
-          )}
+          linkableEntities={visibleEntities.filter((entity) => entity.id !== entityData.entity.id)}
         />
       </div>
     );
@@ -69,6 +68,7 @@ export default async function CampaignLorePage({
   return (
     <div className="lore-browser">
       <SideCategories
+        key={selectedCategory ?? "all"}
         campaignId={campaignId}
         categories={categories}
         selectedCategory={selectedCategory}
@@ -114,6 +114,7 @@ export default async function CampaignLorePage({
           isGm={isGm}
           campaignId={campaignId}
           categories={categories}
+          selectedCategory={selectedCategory}
         />
       </section>
     </div>
