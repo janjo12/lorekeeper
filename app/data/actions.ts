@@ -17,17 +17,21 @@ import {
   deleteCampaign,
   deleteEntity,
   deleteEntityContent,
+  getCampaignInviteEmailDetails,
+  getEntityView,
+  getNotificationRecipient,
   moveCategory,
-  moveEntity,
   renameCampaign,
   removePendingCampaignInvite,
   addEntityContentReveals,
   setEntityContentReveal,
+  setEntityCoOwners,
   updateEntityContent,
   updateEntityDetails,
   updateThemeSetting,
 } from "@/app/dataloader";
 import { getSession } from "@/lib/session";
+import { sendNotificationEmail } from "@/lib/email";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -62,11 +66,22 @@ export async function editCampaign(formData: FormData) {
 }
 
 export async function inviteCampaignPlayer(formData: FormData) {
+  const session = await getSession();
+  if (!session) redirect("/auth/login");
+  const campaignId = formData.get("campaignId")?.toString();
   const username = formData.get("username")?.toString().trim().toLowerCase().slice(0, 32);
-  if (!username) return;
-  return campaignAction(formData, (userId, campaignId) =>
-    addPendingCampaignInvite(userId, campaignId, username),
-  );
+  if (!campaignId || !username) return;
+  await addPendingCampaignInvite(session.userId, campaignId, username);
+  if (formData.get("sendEmail") === "true") {
+    const details = await getCampaignInviteEmailDetails(session.userId, campaignId, username);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
+    await sendNotificationEmail({
+      to: details.recipient.email,
+      subject: `Invitation to join ${details.campaign.name} on Lorekeeper`,
+      text: `@${details.gm.username} invited you to join ${details.campaign.name} on Lorekeeper. Open your campaign invitations${appUrl ? ` at ${appUrl}/data/campaigns` : " in Lorekeeper"}.`,
+    });
+  }
+  revalidatePath("/data", "layout");
 }
 
 export type CampaignPlayerState = { message?: string; success?: boolean };
@@ -117,7 +132,21 @@ export async function addLoreEntity(formData: FormData) {
   const name = formData.get("name")?.toString().trim();
   const categoryId = formData.get("categoryId")?.toString();
   if (!campaignId || !name) return;
-  await createLoreEntity(campaignId, session.userId, name.slice(0, 80), categoryId);
+  const entity = await createLoreEntity(campaignId, session.userId, name.slice(0, 80), categoryId);
+  const description = formData.get("description")?.toString().trim();
+  if (description) {
+    try {
+      await addEntityTextbox(
+        session.userId,
+        entity.id,
+        "Description",
+        description.slice(0, 12_000),
+      );
+    } catch (error) {
+      await deleteEntity(session.userId, entity.id);
+      throw error;
+    }
+  }
   revalidatePath("/data/campaign-lore");
 }
 
@@ -153,7 +182,26 @@ export async function editEntity(formData: FormData) {
       formData.get("name")?.toString().trim().slice(0, 80) || "Untitled",
       categoryId,
     );
-    await moveEntity(userId, entityId, categoryId);
+  });
+}
+
+export async function updateEntityCoOwners(formData: FormData) {
+  return entityAction(formData, async (userId, entityId) => {
+    const profileIds = [...new Set(formData.getAll("profileId").map(String))];
+    await setEntityCoOwners(userId, entityId, profileIds);
+    if (formData.get("sendEmail") !== "true") return;
+    const entity = await getEntityView(entityId, userId);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
+    await Promise.all(
+      profileIds.map(async (profileId) => {
+        const recipient = await getNotificationRecipient(profileId);
+        await sendNotificationEmail({
+          to: recipient.email,
+          subject: `You are now a co-owner of ${entity.entity.name} on Lorekeeper`,
+          text: `You can now manage ${entity.entity.name} in ${entity.campaign.name} on Lorekeeper${appUrl ? `: ${appUrl}/data/campaign-lore?campaign=${entity.campaign.id}&entity=${entity.entity.id}` : "."}`,
+        });
+      }),
+    );
   });
 }
 
@@ -273,15 +321,7 @@ export async function removeEntityContent(formData: FormData) {
   return contentAction(formData, deleteEntityContent);
 }
 
-const allowedThemes = new Set([
-  "system",
-  "parchment",
-  "ivory",
-  "sage",
-  "midnight",
-  "ember",
-  "ink",
-]);
+const allowedThemes = new Set(["system", "parchment", "ivory", "sage", "midnight", "ember", "ink"]);
 
 export async function saveTheme(theme: string) {
   const session = await getSession();

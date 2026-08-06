@@ -8,13 +8,14 @@ available.
 
 The application includes:
 
-- Account signup, login, and signed session cookies
-- GM-owned campaigns with player invitations
+- Account signup, login, password recovery, and signed session cookies
+- GM-owned campaigns with player invitations and optional email notices
 - Nested lore categories and campaign entities
 - Named textboxes and private image uploads
 - Per-player and reveal-to-all lore visibility
 - Realtime campaign invitation and lore-reveal notifications
 - Entity tags, comments, and automatic links between named entities
+- Per-entity player co-owners with GM-scoped assignment and optional email notices
 - Six accessible account-level color themes
 - Responsive layouts for desktop and mobile screens
 
@@ -100,6 +101,9 @@ SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SECRET_KEY=your-server-secret-or-service-role-key
 SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
 SESSION_SECRET=replace-with-at-least-32-random-characters
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+RESEND_API_KEY=re_replace-with-your-resend-api-key
+NOTIFICATION_EMAIL_FROM=Lorekeeper <notifications@example.com>
 ```
 
 Where the values come from:
@@ -111,6 +115,15 @@ Where the values come from:
 - `SUPABASE_PUBLISHABLE_KEY`: the publishable or legacy anon key used for user authentication and
   the authenticated Realtime client.
 - `SESSION_SECRET`: a random value of at least 32 characters used to sign Lorekeeper's session JWT.
+- `NEXT_PUBLIC_APP_URL`: the canonical application origin used in password recovery and notification links.
+- `RESEND_API_KEY` and `NOTIFICATION_EMAIL_FROM`: server-only notification email configuration.
+  These are required only when a GM checks an email-notification option. Supabase Auth sends the
+  separate password-recovery email through the project's configured Auth SMTP provider.
+
+Add both the local and deployed `${NEXT_PUBLIC_APP_URL}/auth/reset-password` URLs to Supabase
+Authentication's redirect URL allow list. Configure `NOTIFICATION_EMAIL_FROM` with a sender on a
+domain verified by Resend; otherwise checked campaign/entity email notices will be rejected by the
+email provider.
 
 Generate a session secret with either:
 
@@ -230,14 +243,21 @@ Important implementation details:
 
 At a high level:
 
-- A `profile` corresponds to a Supabase Auth user and stores account preferences.
-- A `campaign` belongs to one GM and can have invited/accepted players.
-- A campaign contains `entity` records organized through nested `category` records.
-- Entities contain `entity_textbox` and `entity_image` content.
-- `textbox_revealed` and `image_revealed` determine which players can see content. A null target
-  means the content is revealed to every campaign player.
-- Tags are account-owned and connect to entities through `entity_tag`.
-- Comments belong to an entity and the profile that posted them.
+- `profile` corresponds one-to-one with a Supabase Auth user and stores username, last campaign,
+  and theme preferences. `profile_ai_api` stores encrypted, account-owned AI provider credentials.
+- `campaign` belongs to one GM. `pending_campaign_invites` stores invitations awaiting a player's
+  acceptance; accepted membership is stored in `campaign_player`.
+- `category` belongs to a campaign and uses `parent_category_id` for nesting. `entity` belongs to a
+  campaign and may belong to one category from that same campaign.
+- `entity_co_owner` joins an entity to one or more accepted campaign players. Assignment is
+  immediate and GM-controlled. Co-owners may rename—but not move or delete—the entity, and may add,
+  edit, delete, reveal, and unreveal its textboxes and images.
+- `entity_textbox` and `entity_image` belong to an entity. Image rows store metadata and a private
+  Supabase Storage path in the `entity-images` bucket.
+- `textbox_revealed` and `image_revealed` join content to specific player profiles; a null
+  `profile_id` means the content is revealed to every accepted campaign player.
+- `tag` is account-owned and connects to entities through `entity_tag`.
+- `comment` belongs to an entity and the profile that posted it.
 
 The complete executable schema and its evolution live in `supabase/migrations/`; consult those files
 instead of maintaining a separate hand-written schema diagram.

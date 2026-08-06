@@ -104,3 +104,15 @@ describe("campaign invitation dashboard", () => {
     });
   });
 });
+
+describe("campaign invitation email option", () => {
+  const form = source("../app/data/campaigns/add-player-form.tsx");
+  const actions = source("../app/data/actions.ts");
+
+  it("is unticked by default and only sends email when requested", () => {
+    expect(form).toContain('type="checkbox" name="sendEmail" value="true"');
+    expect(form).not.toContain("defaultChecked");
+    expect(actions).toContain('formData.get("sendEmail") === "true"');
+    expect(actions).toContain("Invitation to join");
+  });
+});

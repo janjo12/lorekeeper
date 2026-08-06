@@ -1034,6 +1034,21 @@ input {
   margin: 0.55rem 0 0;
   color: var(--muted-text);
 }
+
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+}
+
+.checkbox-row input {
+  flex: 0 0 auto;
+}
+
+.auth-forgot-link {
+  align-self: flex-end;
+  font-size: 0.9rem;
+}
 .danger-button {
   padding: 0.65rem 0.8rem;
   border: 1px solid var(--danger);
@@ -1565,6 +1580,47 @@ input {
 .dialog-form {
   display: grid;
   gap: 1rem;
+}
+.ai-mode-button {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.45rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font: 700 0.8rem Arial, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 7px rgb(0 0 0 / 12%);
+}
+.ai-mode-button span {
+  display: none;
+}
+.ai-mode-button::before {
+  content: "✦";
+  font-size: 1rem;
+}
+.ai-mode-button.is-active::before {
+  content: "✎";
+}
+.ai-mode-button:hover,
+.ai-mode-button:focus-visible,
+.ai-mode-button.is-active {
+  background: var(--accent-soft);
+}
+.ai-mode-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.ai-mode-button:disabled:hover {
+  background: var(--surface);
+}
+.dialog-form textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .material-field {
   display: grid;
@@ -2167,6 +2223,7 @@ input {
 .ai-api-form > .field-help,
 .ai-api-form > .form-error,
 .ai-api-form > .form-success,
+.ai-api-form > .ai-api-connection-test,
 .ai-api-form > button {
   grid-column: 1 / -1;
 }

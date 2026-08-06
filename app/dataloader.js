@@ -143,6 +143,44 @@ export async function changeUserPassword(userId, email, currentPassword, newPass
   return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken };
 }
 
+export async function requestPasswordReset(email, redirectTo) {
+  const { error } = await createAuthClient().auth.resetPasswordForEmail(email, { redirectTo });
+  throwIfError(error, "Could not send password reset email");
+}
+
+export async function getNotificationRecipient(profileId) {
+  const [{ data: profile, error: profileError }, { data: auth, error: authError }] =
+    await Promise.all([
+      getDatabase().from("profile").select("id, username").eq("id", profileId).single(),
+      getDatabase().auth.admin.getUserById(profileId),
+    ]);
+  throwIfError(profileError, "Could not load notification recipient");
+  throwIfError(authError, "Could not load notification email");
+  if (!auth.user?.email) throw new Error("That player does not have an email address.");
+  return { ...profile, email: auth.user.email };
+}
+
+export async function getCampaignInviteEmailDetails(ownerId, campaignId, username) {
+  const { data: campaign, error } = await getDatabase()
+    .from("campaign")
+    .select("id, name")
+    .eq("id", campaignId)
+    .eq("user_id", ownerId)
+    .single();
+  throwIfError(error, "Could not load campaign invitation details");
+  const { data: player, error: playerError } = await getDatabase()
+    .from("profile")
+    .select("id")
+    .eq("username", username)
+    .single();
+  throwIfError(playerError, "Could not load invited player");
+  return {
+    campaign,
+    gm: await getNotificationRecipient(ownerId),
+    recipient: await getNotificationRecipient(player.id),
+  };
+}
+
 export async function updateProfileUsername(userId, username) {
   const { data, error } = await getDatabase()
     .from("profile")
@@ -487,6 +525,16 @@ export const updateEntityDetails = (userId, entityId, name, categoryId) =>
       requested_category_id: categoryId || null,
     },
     "Could not update entity",
+  );
+export const setEntityCoOwners = (userId, entityId, profileIds) =>
+  runEntityMutation(
+    "set_entity_co_owners",
+    {
+      requesting_user_id: userId,
+      requested_entity_id: entityId,
+      co_owner_profile_ids: profileIds,
+    },
+    "Could not update entity co-owners",
   );
 
 async function getOwnedCategory(userId, categoryId, campaignId) {

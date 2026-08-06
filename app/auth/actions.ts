@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { z } from "zod";
-import { loginUser, signupUser } from "@/app/dataloader";
+import { loginUser, requestPasswordReset, signupUser } from "@/app/dataloader";
 import { createSession, deleteSession } from "@/lib/session";
 
 export type AuthState = {
@@ -68,6 +69,20 @@ export async function login(_state: AuthState, formData: FormData): Promise<Auth
     return { message: authErrorMessage(error, "Invalid email or password.") };
   }
   redirect("/data/campaigns");
+}
+
+export async function forgotPassword(_state: AuthState, formData: FormData): Promise<AuthState> {
+  const email = z.email("Enter a valid email address.").trim().toLowerCase().safeParse(formData.get("email"));
+  if (!email.success) return { errors: { email: [email.error.issues[0].message] } };
+  try {
+    const requestHeaders = await headers();
+    const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || requestHeaders.get("origin");
+    if (!origin) throw new Error("Application URL is not configured");
+    await requestPasswordReset(email.data, `${origin}/auth/reset-password`);
+  } catch (error) {
+    console.error("Password recovery failed", error);
+  }
+  return { message: "If that email belongs to an account, a password reset link is on its way." };
 }
 
 export async function logout() {

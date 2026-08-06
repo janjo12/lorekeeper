@@ -81,6 +81,11 @@ export function AuthForm({ mode, action }: Props) {
         </FormField>
       )}
       <FormMessage>{state.message}</FormMessage>
+      {!signingUp && (
+        <Link className="auth-forgot-link" href="/auth/forgot-password">
+          Forgot password?
+        </Link>
+      )}
       <SubmitButton disabled={pending} pendingLabel="Please wait…">
         {signingUp ? "Create account" : "Sign in"}
       </SubmitButton>

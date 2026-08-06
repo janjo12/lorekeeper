@@ -6,8 +6,10 @@ import { Button, DialogActions, FormField } from "@/app/components/ui";
 import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 import { useDismissOnOutside } from "@/app/components/use-dismiss-on-outside";
 import CategoryTreePicker from "@/app/data/campaign-lore/category-tree-picker";
+import AiCreationForm, { AiModeButton } from "@/app/data/campaign-lore/ai-creation-form";
 
 type Category = { id: string; name: string; parent_category_id?: string | null };
+type Entity = { id: string; name: string; category_id?: string | null };
 type CreationMode = "entity" | "category" | null;
 
 function PlusIcon({ close = false }: { close?: boolean }) {
@@ -41,14 +43,19 @@ function CategoryIcon() {
 export default function CreateFab({
   campaignId,
   categories,
+  entities,
+  hasAiApi,
   selectedCategory,
 }: {
   campaignId: string;
   categories: Category[];
+  entities: Entity[];
+  hasAiApi: boolean;
   selectedCategory?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<CreationMode>(null);
+  const [aiMode, setAiMode] = useState(false);
   const firstInput = useRef<HTMLInputElement>(null);
   const closeCreationMenu = useCallback(() => setExpanded(false), []);
   const speedDialRef = useDismissOnOutside<HTMLDivElement>(expanded, closeCreationMenu);
@@ -70,6 +77,7 @@ export default function CreateFab({
 
   function openDialog(nextMode: Exclude<CreationMode, null>) {
     setMode(nextMode);
+    setAiMode(false);
     setExpanded(false);
   }
 
@@ -125,7 +133,62 @@ export default function CreateFab({
                 ? "Add a new entry to this campaign's archive."
                 : "Add a category for organizing your lore."}
             </p>
-            {mode === "entity" ? (
+            <AiModeButton
+              active={aiMode}
+              disabled={!hasAiApi}
+              onClick={() => setAiMode((active) => !active)}
+            />
+            {aiMode ? (
+              <AiCreationForm
+                kind={mode}
+                action={mode === "entity" ? addLoreEntity : addCategory}
+                context={(formData) => {
+                  if (mode === "category") {
+                    return {
+                      existingCategories: categories.map((category) => ({
+                        name: category.name,
+                        parent:
+                          categories.find((parent) => parent.id === category.parent_category_id)
+                            ?.name ?? null,
+                      })),
+                    };
+                  }
+                  const categoryId = String(formData.get("categoryId") ?? "");
+                  const byId = new Map(categories.map((category) => [category.id, category]));
+                  const categoryPath: string[] = [];
+                  const visited = new Set<string>();
+                  let currentId: string | null | undefined = categoryId || null;
+                  while (currentId && !visited.has(currentId)) {
+                    visited.add(currentId);
+                    const category = byId.get(currentId);
+                    if (!category) break;
+                    categoryPath.unshift(category.name);
+                    currentId = category.parent_category_id;
+                  }
+                  return {
+                    categoryPath,
+                    existingEntityNames: entities
+                      .filter((entity) => (entity.category_id ?? "") === categoryId)
+                      .map((entity) => entity.name),
+                  };
+                }}
+                onCancel={() => setMode(null)}
+                onSuccess={() => setMode(null)}
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <FormField
+                  label={mode === "entity" ? "Category" : "Parent category"}
+                  variant="material"
+                >
+                  <CategoryTreePicker
+                    categories={categories}
+                    defaultValue={selectedCategory}
+                    name={mode === "entity" ? "categoryId" : "parentCategoryId"}
+                    topLevelLabel={mode === "entity" ? "No category" : "Top-level category"}
+                  />
+                </FormField>
+              </AiCreationForm>
+            ) : mode === "entity" ? (
               <ActionForm
                 action={addLoreEntity}
                 className="dialog-form"

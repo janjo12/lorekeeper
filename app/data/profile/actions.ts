@@ -103,7 +103,10 @@ export async function updatePassword(
     await createSession(session, tokens);
     return { success: true, message: "Password updated." };
   } catch (error) {
-    if (error instanceof Error && /invalid email or password|invalid login credentials|current password/i.test(error.message)) {
+    if (
+      error instanceof Error &&
+      /invalid email or password|invalid login credentials|current password/i.test(error.message)
+    ) {
       return { message: "Your current password is incorrect." };
     }
     return { message: "We could not update your password." };
@@ -127,6 +130,9 @@ const aiApiSchema = z.object({
 export async function addAiApi(_state: AiApiState, formData: FormData): Promise<AiApiState> {
   const session = await getSession();
   if (!session) return { message: "Your session has expired. Sign in again." };
+  if (formData.get("connectionTestPassed") !== "true") {
+    return { message: "Test the connection successfully before saving." };
+  }
   const parsed = aiApiSchema.safeParse({
     name: formData.get("name"),
     provider: formData.get("provider"),

@@ -13,6 +13,7 @@ import {
   editEntityContent,
   removeEntity,
   removeEntityContent,
+  updateEntityCoOwners,
 } from "@/app/data/actions";
 
 type Category = { id: string; name: string };
@@ -21,6 +22,8 @@ type EntityData = {
   entity: { id: string; name: string; category_id?: string; campaign_id: string };
   campaign: { id: string; name: string; user_id: string };
   campaign_players: Player[];
+  co_owners?: Player[];
+  is_co_owner?: boolean;
   textboxes: Array<{
     id: string;
     name?: string;
@@ -169,14 +172,18 @@ export default function EntityView({
   currentUserId,
   isGm,
   linkableEntities,
+  hasAiApi,
 }: {
   data: EntityData;
   categories: Category[];
   currentUserId: string;
   isGm: boolean;
   linkableEntities: LinkableEntity[];
+  hasAiApi: boolean;
 }) {
   const attached = new Set(data.tags.map((tag) => tag.id));
+  const canManageContent = isGm || data.is_co_owner === true;
+  const coOwnerIds = new Set((data.co_owners ?? []).map((player) => player.id));
   return (
     <section className="entity-view">
       <Link className="back-link" href={`/data/campaign-lore?campaign=${data.campaign.id}`}>
@@ -194,7 +201,7 @@ export default function EntityView({
             ))}
           </div>
         </div>
-        {isGm && (
+        {canManageContent && (
           <div className="entity-header-actions">
             <DismissibleDetails className="edit-details">
               <summary className="secondary-button">Edit entity</summary>
@@ -207,7 +214,7 @@ export default function EntityView({
                 <FormField label="Name" variant="material">
                   <input name="name" defaultValue={data.entity.name} required />
                 </FormField>
-                <FormField label="Category" variant="material">
+                {isGm ? <FormField label="Category" variant="material">
                   <select name="categoryId" defaultValue={data.entity.category_id || ""}>
                     <option value="">No category</option>
                     {categories.map((category) => (
@@ -216,13 +223,33 @@ export default function EntityView({
                       </option>
                     ))}
                   </select>
-                </FormField>
+                </FormField> : <input type="hidden" name="categoryId" value={data.entity.category_id || ""} />}
                 <SubmitButton variant="filled" pendingLabel="Saving…">
                   Save
                 </SubmitButton>
               </ActionForm>
             </DismissibleDetails>
-            <ActionForm
+            {isGm && <DismissibleDetails className="edit-details">
+              <summary className="secondary-button">Co-owners</summary>
+              <ActionForm action={updateEntityCoOwners} className="edit-entity-form" errorMessage="We couldn’t update this entity’s co-owners.">
+                <input type="hidden" name="entityId" value={data.entity.id} />
+                <fieldset className="reveal-player-options">
+                  <legend>Campaign players</legend>
+                  {data.campaign_players.length ? data.campaign_players.map((player) => (
+                    <label className="reveal-option" key={player.id}>
+                      <input type="checkbox" name="profileId" value={player.id} defaultChecked={coOwnerIds.has(player.id)} />
+                      @{player.username}
+                    </label>
+                  )) : <p>Add campaign players before assigning co-owners.</p>}
+                </fieldset>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="sendEmail" value="true" />
+                  Email selected players about co-ownership
+                </label>
+                <SubmitButton variant="filled" pendingLabel="Saving…">Save co-owners</SubmitButton>
+              </ActionForm>
+            </DismissibleDetails>}
+            {isGm && <ActionForm
               action={removeEntity}
               errorMessage="We couldn’t delete this entity. Please try again."
             >
@@ -234,7 +261,7 @@ export default function EntityView({
               >
                 Delete entity
               </ConfirmDeleteButton>
-            </ActionForm>
+            </ActionForm>}
           </div>
         )}
       </header>
@@ -252,29 +279,24 @@ export default function EntityView({
                 revealedToAll={item.revealed_to_all}
                 revealedProfileIds={item.revealed_profile_ids}
                 currentUserId={currentUserId}
-                isGm={isGm}
+                isGm={canManageContent}
               />
-              {isGm && (
-                <ContentActions
-                  id={item.id}
-                  type="image"
-                  name={item.name || "Image"}
-                  value=""
-                />
+              {canManageContent && (
+                <ContentActions id={item.id} type="image" name={item.name || "Image"} value="" />
               )}
             </header>
             <div className="entity-image-placeholder">
-            {item.signed_url && (
-              // Signed Storage URLs expire, so bypassing Next's persistent image
-              // optimizer cache keeps the private URL lifecycle predictable.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={item.signed_url}
-                alt={item.name || data.entity.name}
-                width={800}
-                height={450}
-              />
-            )}
+              {item.signed_url && (
+                // Signed Storage URLs expire, so bypassing Next's persistent image
+                // optimizer cache keeps the private URL lifecycle predictable.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.signed_url}
+                  alt={item.name || data.entity.name}
+                  width={800}
+                  height={450}
+                />
+              )}
             </div>
           </figure>
         ))}
@@ -293,9 +315,9 @@ export default function EntityView({
                 revealedToAll={box.revealed_to_all}
                 revealedProfileIds={box.revealed_profile_ids}
                 currentUserId={currentUserId}
-                isGm={isGm}
+                isGm={canManageContent}
               />
-              {isGm && (
+              {canManageContent && (
                 <ContentActions
                   id={box.id}
                   type="textbox"
@@ -318,7 +340,7 @@ export default function EntityView({
         <div className="empty-state">
           <h2>No content yet</h2>
           <p>
-            {isGm
+            {canManageContent
               ? "Use the create button to add an image or textbox."
               : "No content has been revealed for this entity yet."}
           </p>
@@ -327,7 +349,7 @@ export default function EntityView({
       <section className="entity-meta">
         <div>
           <h2>Tags</h2>
-          <ActionForm
+          {isGm && <ActionForm
             action={attachEntityTag}
             className="inline-create-form compact-inline-form"
             errorMessage="We couldn’t add that tag. Please try again."
@@ -346,11 +368,20 @@ export default function EntityView({
             <SubmitButton variant="secondary" pendingLabel="Adding…">
               Add tag
             </SubmitButton>
-          </ActionForm>
+          </ActionForm>}
         </div>
         <EntityComments entityId={data.entity.id} initialComments={data.comments} />
       </section>
-      <EntityCreationControls isGm={isGm} entityId={data.entity.id} />
+      <EntityCreationControls
+        isGm={canManageContent}
+        entityId={data.entity.id}
+        entityContext={{
+          entityName: data.entity.name,
+          images: data.images,
+          textboxes: data.textboxes,
+        }}
+        hasAiApi={hasAiApi}
+      />
     </section>
   );
 }

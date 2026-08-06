@@ -4,7 +4,12 @@ import EntityView from "@/app/data/campaign-lore/entity-view";
 import LoreSearch from "@/app/data/campaign-lore/lore-search";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCampaignLore, getCampaignsForUser, getEntityView } from "@/app/dataloader";
+import {
+  getAiApisForUser,
+  getCampaignLore,
+  getCampaignsForUser,
+  getEntityView,
+} from "@/app/dataloader";
 import { getSession } from "@/lib/session";
 import { type LoreCategory, type LoreEntity } from "@/app/data/campaign-lore/lore-visibility";
 import { EmptyState, PageHeader } from "@/app/components/ui";
@@ -30,6 +35,7 @@ export default async function CampaignLorePage({
   const allCategories = lore.categories as LoreCategory[];
   const campaignEntities = lore.entities as LoreEntity[];
   const isGm = lore.campaign.user_id === session.userId;
+  const hasAiApi = isGm && (await getAiApisForUser(session.userId)).length > 0;
   const visibleEntities = campaignEntities;
   const categories = allCategories;
   const selectedCategory = categories.some((category) => category.id === params.category)
@@ -60,6 +66,7 @@ export default async function CampaignLorePage({
           currentUserId={session.userId}
           isGm={isGm}
           linkableEntities={visibleEntities.filter((entity) => entity.id !== entityData.entity.id)}
+          hasAiApi={hasAiApi}
         />
       </div>
     );
@@ -114,6 +121,8 @@ export default async function CampaignLorePage({
           isGm={isGm}
           campaignId={campaignId}
           categories={categories}
+          entities={visibleEntities}
+          hasAiApi={hasAiApi}
           selectedCategory={selectedCategory}
         />
       </section>

@@ -23,10 +23,16 @@ if (!url || !secretKey) {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
   const nonexistentUserId = crypto.randomUUID();
-  const { error } = await client.rpc("create_seeded_campaign", {
-    requesting_user_id: nonexistentUserId,
-    campaign_name: "__lorekeeper_contract_probe__",
-  });
+  const [{ error }, coOwnerProbe] = await Promise.all([
+    client.rpc("create_seeded_campaign", {
+      requesting_user_id: nonexistentUserId,
+      campaign_name: "__lorekeeper_contract_probe__",
+    }),
+    client.rpc("can_manage_entity_content", {
+      requesting_user_id: nonexistentUserId,
+      requested_entity_id: crypto.randomUUID(),
+    }),
+  ]);
 
   if (!error) {
     console.error("Backend contract probe unexpectedly created a campaign.");
@@ -42,6 +48,21 @@ if (!url || !secretKey) {
     );
     process.exitCode = 1;
   } else {
-    console.log("Backend contract check passed: create_seeded_campaign is deployed.");
+    if (
+      coOwnerProbe.error?.code === "PGRST202" ||
+      /could not find the function/i.test(coOwnerProbe.error?.message ?? "")
+    ) {
+      console.error(
+        "Backend contract is out of date: entity co-ownership functions are missing. Apply supabase/migrations before deploying the app.",
+      );
+      process.exitCode = 1;
+    } else if (coOwnerProbe.error) {
+      console.error(
+        `Entity co-ownership contract probe returned an unexpected error (${coOwnerProbe.error.code}): ${coOwnerProbe.error.message}`,
+      );
+      process.exitCode = 1;
+    } else {
+      console.log("Backend contract check passed: campaign creation and entity co-ownership are deployed.");
+    }
   }
 }

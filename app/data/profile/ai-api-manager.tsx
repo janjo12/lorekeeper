@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { ActionForm, FormMessage, SubmitButton } from "@/app/components/form-feedback";
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
 import { FormField } from "@/app/components/ui";
 import { addAiApi, chooseDefaultAiApi, removeAiApi } from "@/app/data/profile/actions";
-import { testAiApiConnection } from "@/app/ailoader";
+import { testAiApiConnection, testSavedAiApiConnection } from "@/app/ailoader";
 
 export type AiApiSummary = {
   id: string;
@@ -16,18 +16,43 @@ export type AiApiSummary = {
   is_default: boolean;
 };
 
-function AiApiConnectionTest({ apiId }: { apiId: string }) {
-  const [state, action, pending] = useActionState(testAiApiConnection, { message: "" });
+function connectionSignature(values: FormData) {
+  return [values.get("provider"), values.get("baseUrl"), values.get("apiKey")].join("\n");
+}
+
+function SavedApiConnectionTest({ apiId }: { apiId: string }) {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ message: string; response?: string; success?: boolean }>({
+    message: "",
+  });
+
+  async function testConnection() {
+    setTesting(true);
+    setResult({ message: "" });
+    try {
+      const response = await testSavedAiApiConnection(apiId);
+      setResult({ success: true, message: "Connection successful.", response });
+    } catch (error) {
+      setResult({
+        message: error instanceof Error ? error.message : "The AI connection test failed.",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <div className="ai-api-connection-test">
-      <form action={action}>
-        <input type="hidden" name="apiId" value={apiId} />
-        <SubmitButton disabled={pending} variant="secondary" pendingLabel="Testing…">
-          Test connection
-        </SubmitButton>
-      </form>
-      <FormMessage success={state.success}>{state.message}</FormMessage>
-      {state.response && <blockquote>{state.response}</blockquote>}
+      <button
+        className="secondary-button"
+        disabled={testing}
+        onClick={testConnection}
+        type="button"
+      >
+        {testing ? "Testing…" : "Test connection"}
+      </button>
+      <FormMessage success={result.success}>{result.message}</FormMessage>
+      {result.response && <blockquote>{result.response}</blockquote>}
     </div>
   );
 }
@@ -35,18 +60,47 @@ function AiApiConnectionTest({ apiId }: { apiId: string }) {
 export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
   const [state, action, pending] = useActionState(addAiApi, {});
   const formRef = useRef<HTMLFormElement>(null);
+  const [testing, setTesting] = useState(false);
+  const [testedSignature, setTestedSignature] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{
+    message: string;
+    response?: string;
+    success?: boolean;
+  }>({ message: "" });
 
   useEffect(() => {
     if (state.success) formRef.current?.reset();
   }, [state.success]);
+
+  async function testConnection() {
+    if (!formRef.current) return;
+    const values = new FormData(formRef.current);
+    setTesting(true);
+    setTestResult({ message: "" });
+    try {
+      const response = await testAiApiConnection({
+        provider: String(values.get("provider") ?? ""),
+        baseUrl: String(values.get("baseUrl") ?? ""),
+        apiKey: String(values.get("apiKey") ?? ""),
+      });
+      setTestedSignature(connectionSignature(values));
+      setTestResult({ success: true, message: "Connection successful.", response });
+    } catch (error) {
+      setTestResult({
+        message: error instanceof Error ? error.message : "The AI connection test failed.",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
     <section className="ai-api-settings" aria-labelledby="ai-api-settings-title">
       <header>
         <h2 id="ai-api-settings-title">AI APIs</h2>
         <p>
-          Store multiple API credentials and choose the default used by future generation tools.
-          Secret keys are encrypted and cannot be viewed again after saving.
+          Test your local AnythingLLM connection in this browser, then save the encrypted credential
+          for future tools.
         </p>
       </header>
 
@@ -65,7 +119,7 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
                 {api.base_url && <small>{api.base_url}</small>}
               </div>
               <div className="ai-api-actions">
-                <AiApiConnectionTest apiId={api.id} />
+                <SavedApiConnectionTest apiId={api.id} />
                 {!api.is_default && (
                   <ActionForm
                     action={chooseDefaultAiApi}
@@ -92,8 +146,27 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
         </div>
       )}
 
-      <form ref={formRef} action={action} className="ai-api-form">
+      <form
+        ref={formRef}
+        action={action}
+        className="ai-api-form"
+        onChange={() => setTestedSignature(null)}
+        onSubmit={(event) => {
+          const currentSignature = connectionSignature(new FormData(event.currentTarget));
+          if (testedSignature !== currentSignature) {
+            event.preventDefault();
+            setTestResult({
+              message: "Test this exact URL and API key successfully before saving.",
+            });
+          }
+        }}
+      >
         <h3>Add an AI API</h3>
+        <input
+          type="hidden"
+          name="connectionTestPassed"
+          value={testedSignature ? "true" : "false"}
+        />
         <FormField label="Name" htmlFor="ai-api-name" errors={state.errors?.name}>
           <input
             id="ai-api-name"
@@ -109,7 +182,7 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
           </select>
         </FormField>
         <FormField
-          label="Base URL (optional)"
+          label="Workspace chat URL"
           htmlFor="ai-api-base-url"
           errors={state.errors?.baseUrl}
         >
@@ -118,6 +191,7 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
             name="baseUrl"
             type="url"
             placeholder="http://localhost:3001/api/v1/workspace/lorekeeper/chat"
+            required
             maxLength={500}
           />
         </FormField>
@@ -141,6 +215,18 @@ export default function AiApiManager({ apis }: { apis: AiApiSummary[] }) {
           <p className="field-help">Your first API automatically becomes the default.</p>
         )}
         <FormMessage success={state.success}>{state.message}</FormMessage>
+        <div className="ai-api-connection-test">
+          <button
+            className="secondary-button"
+            disabled={testing}
+            onClick={testConnection}
+            type="button"
+          >
+            {testing ? "Testing…" : "Test connection"}
+          </button>
+          <FormMessage success={testResult.success}>{testResult.message}</FormMessage>
+          {testResult.response && <blockquote>{testResult.response}</blockquote>}
+        </div>
         <SubmitButton disabled={pending} pendingLabel="Encrypting and saving…">
           Add API
         </SubmitButton>

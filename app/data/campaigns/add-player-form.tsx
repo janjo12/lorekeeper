@@ -13,6 +13,10 @@ export default function AddPlayerForm({ campaignId }: { campaignId: string }) {
       <FormField label="Invite player by username" variant="material">
         <input name="username" placeholder="unique_username" required maxLength={32} />
       </FormField>
+      <label className="checkbox-row">
+        <input type="checkbox" name="sendEmail" value="true" />
+        Email this player about the invitation
+      </label>
       <SubmitButton variant="secondary" disabled={pending} pendingLabel="Sending…">
         Send invitation
       </SubmitButton>
