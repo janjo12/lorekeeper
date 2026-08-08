@@ -37,7 +37,8 @@ describe("AI provider boundary", () => {
     expect(aiLoader).toContain('new Set(["localhost", "127.0.0.1", "::1"])');
     expect(aiLoader).toContain('targetAddressSpace: "local"');
     expect(aiLoader).toContain('mode: "cors"');
-    expect(aiLoader).toContain("set Local network access to Allow");
+    expect(aiLoader).toContain("canReachLocalServer(chatUrl)");
+    expect(aiLoader).toContain("Local network access is not the problem");
     expect(manager).toContain("change it in the site");
   });
 

@@ -6,8 +6,9 @@ const form = readFileSync(
   new URL("../app/data/profile/password-form.tsx", import.meta.url),
   "utf8",
 );
-const actions = readFileSync(
-  new URL("../app/data/profile/actions.ts", import.meta.url),
+const actions = readFileSync(new URL("../app/data/profile/actions.ts", import.meta.url), "utf8");
+const passwordInput = readFileSync(
+  new URL("../app/components/password-input.tsx", import.meta.url),
   "utf8",
 );
 
@@ -15,7 +16,8 @@ describe("profile password management", () => {
   it("places a password-change form on the signed-in profile page", () => {
     expect(page).toContain("<PasswordForm />");
     expect(form).toContain('autoComplete="current-password"');
-    expect(form.match(/type="password"/g)).toHaveLength(3);
+    expect(form.match(/<PasswordInput/g)).toHaveLength(3);
+    expect(passwordInput).toContain('type={visible ? "text" : "password"}');
     expect(form).toContain("Update password");
   });
 

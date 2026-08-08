@@ -2,14 +2,17 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   createAiApiForUser,
   changeUserPassword,
   deleteAiApiForUser,
+  deleteUserAccount,
   setDefaultAiApiForUser,
   updateProfileUsername,
 } from "@/app/dataloader";
-import { createSession, getSession } from "@/lib/session";
+import { createSession, deleteSession, getSession } from "@/lib/session";
+import { MAX_PASSWORD_LENGTH, passwordCreationSchema } from "@/lib/password-policy";
 
 export type ProfileState = {
   errors?: { username?: string[] };
@@ -56,11 +59,8 @@ export type PasswordState = {
 
 const passwordSchema = z
   .object({
-    currentPassword: z.string().min(1, "Enter your current password.").max(72),
-    newPassword: z
-      .string()
-      .min(8, "New password must be at least 8 characters.")
-      .max(72, "New password must be 72 characters or fewer."),
+    currentPassword: z.string().min(1, "Enter your current password.").max(MAX_PASSWORD_LENGTH),
+    newPassword: passwordCreationSchema,
     confirmPassword: z.string(),
   })
   .superRefine((values, context) => {
@@ -72,6 +72,13 @@ const passwordSchema = z
       });
     }
   });
+
+function isInvalidPasswordError(error: unknown) {
+  return (
+    error instanceof Error &&
+    /invalid email or password|invalid login credentials|current password/i.test(error.message)
+  );
+}
 
 export async function updatePassword(
   _state: PasswordState,
@@ -96,10 +103,7 @@ export async function updatePassword(
     await createSession(session, tokens);
     return { success: true, message: "Password updated." };
   } catch (error) {
-    if (
-      error instanceof Error &&
-      /invalid email or password|invalid login credentials|current password/i.test(error.message)
-    ) {
+    if (isInvalidPasswordError(error)) {
       return { message: "Your current password is incorrect." };
     }
     return { message: "We could not update your password." };
@@ -163,4 +167,30 @@ export async function removeAiApi(formData: FormData) {
   const apiId = apiIdSchema.parse(formData.get("apiId"));
   await deleteAiApiForUser(session.userId, apiId);
   revalidatePath("/data/profile");
+}
+
+export type DeleteAccountState = {
+  message?: string;
+};
+
+export async function deleteCurrentAccount(
+  _state: DeleteAccountState,
+  formData: FormData,
+): Promise<DeleteAccountState> {
+  const session = await getSession();
+  if (!session) redirect("/auth/login");
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  if (!currentPassword) return { message: "Enter your current password to delete your account." };
+
+  try {
+    await deleteUserAccount(session.userId, session.email, currentPassword);
+  } catch (error) {
+    if (isInvalidPasswordError(error)) {
+      return { message: "Your current password is incorrect." };
+    }
+    return { message: "We could not delete your account. Nothing was intentionally removed." };
+  }
+
+  await deleteSession();
+  redirect("/auth/login");
 }

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { loginUser, requestPasswordReset, signupUser } from "@/app/dataloader";
 import { createSession, deleteSession } from "@/lib/session";
+import { passwordCreationSchema } from "@/lib/password-policy";
 
 export type AuthState = {
   errors?: {
@@ -17,10 +18,6 @@ export type AuthState = {
   success?: boolean;
 };
 
-const passwordCreationSchema = z
-  .string()
-  .min(8, "Password must be at least 8 characters.")
-  .max(72);
 const loginSchema = z.object({
   email: z.email("Enter a valid email address.").trim().toLowerCase(),
   // Login must accept any existing credential. Password policy belongs only
@@ -44,16 +41,27 @@ const signupSchema = loginSchema
     message: "Passwords do not match.",
   });
 
+type AuthenticatedUser = {
+  id: string;
+  username: string;
+  accessToken: string;
+  refreshToken: string;
+};
+
+async function persistAuthenticatedUser(user: AuthenticatedUser, email: string) {
+  await createSession(
+    { userId: user.id, email, username: user.username },
+    { accessToken: user.accessToken, refreshToken: user.refreshToken },
+  );
+}
+
 export async function signup(_state: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { errors: z.flattenError(parsed.error).fieldErrors };
 
   try {
     const user = await signupUser(parsed.data.email, parsed.data.username, parsed.data.password);
-    await createSession(
-      { userId: user.id, email: parsed.data.email, username: user.username },
-      { accessToken: user.accessToken, refreshToken: user.refreshToken },
-    );
+    await persistAuthenticatedUser(user, parsed.data.email);
   } catch (error) {
     console.error("Signup failed", error);
     return { message: authErrorMessage(error, "We could not create your account.") };
@@ -67,10 +75,7 @@ export async function login(_state: AuthState, formData: FormData): Promise<Auth
 
   try {
     const user = await loginUser(parsed.data.email, parsed.data.password);
-    await createSession(
-      { userId: user.id, email: parsed.data.email, username: user.username },
-      { accessToken: user.accessToken, refreshToken: user.refreshToken },
-    );
+    await persistAuthenticatedUser(user, parsed.data.email);
   } catch (error) {
     console.error("Login failed", error);
     return { message: authErrorMessage(error, "Invalid email or password.") };
@@ -79,11 +84,16 @@ export async function login(_state: AuthState, formData: FormData): Promise<Auth
 }
 
 export async function forgotPassword(_state: AuthState, formData: FormData): Promise<AuthState> {
-  const email = z.email("Enter a valid email address.").trim().toLowerCase().safeParse(formData.get("email"));
+  const email = z
+    .email("Enter a valid email address.")
+    .trim()
+    .toLowerCase()
+    .safeParse(formData.get("email"));
   if (!email.success) return { errors: { email: [email.error.issues[0].message] } };
   try {
     const requestHeaders = await headers();
-    const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || requestHeaders.get("origin");
+    const origin =
+      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || requestHeaders.get("origin");
     if (!origin) throw new Error("Application URL is not configured");
     await requestPasswordReset(email.data, `${origin}/auth/reset-password`);
   } catch (error) {
@@ -120,7 +130,10 @@ function passwordRecoveryThrottlingMessage(error: unknown) {
   }
 
   const code = (error as Error & { code?: string }).code;
-  if (code === "over_email_send_rate_limit" || /email.*rate limit|rate limit.*email/i.test(error.message)) {
+  if (
+    code === "over_email_send_rate_limit" ||
+    /email.*rate limit|rate limit.*email/i.test(error.message)
+  ) {
     return "The email service has reached its sending limit. Try again later; with Supabase’s built-in email service, this can take up to an hour.";
   }
   if (code === "over_request_rate_limit" || /rate limit/i.test(error.message)) {

@@ -250,11 +250,80 @@ describe("dataloader", () => {
     createClient.mockReturnValueOnce(recoveryAuth).mockReturnValueOnce(database);
     const { completePasswordReset } = await loadDataloader();
 
-    await expect(completePasswordReset("recovery-token", "reused-password")).resolves.toBeUndefined();
+    await expect(
+      completePasswordReset("recovery-token", "reused-password"),
+    ).resolves.toBeUndefined();
     expect(recoveryAuth.auth.getUser).toHaveBeenCalledWith("recovery-token");
     expect(database.auth.admin.updateUserById).toHaveBeenCalledWith("recovered-user", {
       password: "reused-password",
     });
+  });
+
+  it("deletes an authenticated account and its owned image files", async () => {
+    const authClient = {
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: {
+            user: { id: "user-1" },
+            session: { access_token: "access", refresh_token: "refresh" },
+          },
+          error: null,
+        }),
+      },
+    };
+    const campaignsQuery = queryReturning({ data: [{ id: "campaign-1" }], error: null });
+    const entitiesQuery = queryReturning({ data: [{ id: "entity-1" }], error: null });
+    const imagesQuery = queryReturning({
+      data: [{ storage_path: "user-1/entity-1/image.png" }],
+      error: null,
+    });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const deleteUser = vi.fn().mockResolvedValue({ error: null });
+    const database = {
+      auth: { admin: { deleteUser } },
+      from: vi
+        .fn()
+        .mockReturnValueOnce(campaignsQuery)
+        .mockReturnValueOnce(entitiesQuery)
+        .mockReturnValueOnce(imagesQuery),
+      storage: { from: vi.fn(() => ({ remove })) },
+    };
+    createClient.mockReturnValueOnce(authClient).mockReturnValueOnce(database);
+    const { deleteUserAccount } = await loadDataloader();
+
+    await deleteUserAccount("user-1", "keeper@example.com", "current-password");
+
+    expect(deleteUser).toHaveBeenCalledWith("user-1");
+    expect(remove).toHaveBeenCalledWith(["user-1/entity-1/image.png"]);
+  });
+
+  it("removes campaign image files after the database cascade", async () => {
+    const campaignsQuery = queryReturning({ data: [{ id: "campaign-1" }], error: null });
+    const entitiesQuery = queryReturning({ data: [{ id: "entity-1" }], error: null });
+    const imagesQuery = queryReturning({
+      data: [{ storage_path: "gm/entity-1/map.png" }],
+      error: null,
+    });
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    createClient.mockReturnValue({
+      from: vi
+        .fn()
+        .mockReturnValueOnce(campaignsQuery)
+        .mockReturnValueOnce(entitiesQuery)
+        .mockReturnValueOnce(imagesQuery),
+      rpc,
+      storage: { from: vi.fn(() => ({ remove })) },
+    });
+    const { deleteCampaign } = await loadDataloader();
+
+    await deleteCampaign("gm", "campaign-1");
+
+    expect(rpc).toHaveBeenCalledWith("delete_campaign", {
+      requesting_user_id: "gm",
+      requested_campaign_id: "campaign-1",
+    });
+    expect(remove).toHaveBeenCalledWith(["gm/entity-1/map.png"]);
   });
 
   it("surfaces a duplicate email instead of replacing its profile", async () => {
@@ -276,24 +345,15 @@ describe("dataloader", () => {
     );
   });
 
-  it("returns null when a profile does not exist", async () => {
-    createClient.mockReturnValue({
-      from: vi.fn(() => queryReturning({ data: null, error: null })),
-    });
-    const { getUserById } = await loadDataloader();
-
-    await expect(getUserById("missing-user")).resolves.toBeNull();
-  });
-
   it("recreates the database client when server credentials change", async () => {
     const firstDatabase = { from: vi.fn(() => queryReturning({ data: null, error: null })) };
     const secondDatabase = { from: vi.fn(() => queryReturning({ data: null, error: null })) };
     createClient.mockReturnValueOnce(firstDatabase).mockReturnValueOnce(secondDatabase);
-    const { getUserById } = await loadDataloader();
+    const { getUserPreferences } = await loadDataloader();
 
-    await getUserById("first-user");
+    await getUserPreferences("first-user");
     process.env.SUPABASE_SECRET_KEY = "rotated-secret-key";
-    await getUserById("second-user");
+    await getUserPreferences("second-user");
 
     expect(createClient).toHaveBeenCalledTimes(2);
     expect(firstDatabase.from).toHaveBeenCalledTimes(1);
@@ -583,10 +643,10 @@ describe("dataloader", () => {
       rpc,
       storage: { from: vi.fn(() => ({ remove })) },
     });
-    const { deleteImage, deleteTextbox } = await loadDataloader();
+    const { deleteEntityContent } = await loadDataloader();
 
-    await deleteTextbox("gm-1", "textbox-1");
-    await deleteImage("gm-1", "image-1");
+    await deleteEntityContent("gm-1", "textbox-1", "textbox");
+    await deleteEntityContent("gm-1", "image-1", "image");
 
     expect(rpc).toHaveBeenNthCalledWith(1, "delete_entity_content", {
       requesting_user_id: "gm-1",
@@ -631,22 +691,27 @@ describe("dataloader", () => {
     const stored = rpc.mock.calls[0][1].encrypted_key;
     expect(stored).not.toContain("sk-super-secret-1234");
     expect(stored).toMatch(/^v1\./);
-    expect(rpc).toHaveBeenCalledWith("create_profile_ai_api", expect.objectContaining({
-      requesting_user_id: "user-1",
-      key_suffix: "1234",
-      make_default: false,
-    }));
+    expect(rpc).toHaveBeenCalledWith(
+      "create_profile_ai_api",
+      expect.objectContaining({
+        requesting_user_id: "user-1",
+        key_suffix: "1234",
+        make_default: false,
+      }),
+    );
 
-    database.from.mockReturnValue(queryReturning({
-      data: {
-        id: "api-1",
-        name: "Primary OpenAI",
-        provider: "OpenAI",
-        base_url: null,
-        encrypted_api_key: stored,
-      },
-      error: null,
-    }));
+    database.from.mockReturnValue(
+      queryReturning({
+        data: {
+          id: "api-1",
+          name: "Primary OpenAI",
+          provider: "OpenAI",
+          base_url: null,
+          encrypted_api_key: stored,
+        },
+        error: null,
+      }),
+    );
     await expect(getAiApiCredentialForTask("user-1", "api-1")).resolves.toMatchObject({
       id: "api-1",
       apiKey: "sk-super-secret-1234",
@@ -654,13 +719,21 @@ describe("dataloader", () => {
   });
 
   it("lists only masked AI API metadata for the profile page", async () => {
-    const api = { id: "api-1", name: "Claude", provider: "Anthropic", key_last_four: "abcd", is_default: true };
+    const api = {
+      id: "api-1",
+      name: "Claude",
+      provider: "Anthropic",
+      key_last_four: "abcd",
+      is_default: true,
+    };
     const query = queryReturning({ data: [api], error: null });
     createClient.mockReturnValue({ from: vi.fn(() => query) });
     const { getAiApisForUser } = await loadDataloader();
 
     await expect(getAiApisForUser("user-1")).resolves.toEqual([api]);
-    expect(query.select).toHaveBeenCalledWith("id, name, provider, base_url, key_last_four, is_default, created_at");
+    expect(query.select).toHaveBeenCalledWith(
+      "id, name, provider, base_url, key_last_four, is_default, created_at",
+    );
     expect(query.eq).toHaveBeenCalledWith("profile_id", "user-1");
   });
 

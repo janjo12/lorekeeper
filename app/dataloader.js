@@ -302,16 +302,6 @@ export async function getAiApiCredentialForTask(userId, apiId) {
   return { ...metadata, apiKey: decryptAiApiKey(encrypted_api_key) };
 }
 
-export async function getUserById(userId) {
-  const { data, error } = await getDatabase()
-    .from("profile")
-    .select("id, username, created_at")
-    .eq("id", userId)
-    .maybeSingle();
-  throwIfError(error, "Could not load profile");
-  return data;
-}
-
 export async function getUserPreferences(userId) {
   const { data, error } = await getDatabase()
     .from("profile")
@@ -394,12 +384,15 @@ export const acceptPendingCampaignInvite = (userId, campaignId) =>
     { requesting_user_id: userId, requested_campaign_id: campaignId },
     "Could not accept campaign invitation",
   );
-export const deleteCampaign = (userId, campaignId) =>
-  runEntityMutation(
+export async function deleteCampaign(userId, campaignId) {
+  const imagePaths = await getOwnedImagePaths(userId, { campaignId });
+  await runEntityMutation(
     "delete_campaign",
     { requesting_user_id: userId, requested_campaign_id: campaignId },
     "Could not delete campaign",
   );
+  await removeStoredImagesAfterDeletion(imagePaths, "campaign");
+}
 
 export async function getCampaignLore(campaignId, userId) {
   const { data, error } = await getDatabase().rpc("get_campaign_lore", {
@@ -716,11 +709,6 @@ export async function deleteEntityContent(userId, contentId, type) {
   }
 }
 
-export const deleteTextbox = (userId, textboxId) =>
-  deleteEntityContent(userId, textboxId, "textbox");
-
-export const deleteImage = (userId, imageId) => deleteEntityContent(userId, imageId, "image");
-
 export async function deleteEntity(userId, entityId) {
   const { data: entity, error: entityError } = await getDatabase()
     .from("entity")
@@ -731,18 +719,85 @@ export async function deleteEntity(userId, entityId) {
   throwIfError(entityError, "Could not load entity");
   if (!entity) throw new Error("Could not delete entity: entity does not exist");
 
-  const [textboxesResult, imagesResult] = await Promise.all([
-    getDatabase().from("entity_textbox").select("id").eq("entity_id", entityId),
-    getDatabase().from("entity_image").select("id").eq("entity_id", entityId),
-  ]);
-  throwIfError(textboxesResult.error, "Could not load entity textboxes");
-  throwIfError(imagesResult.error, "Could not load entity images");
-
-  for (const textbox of textboxesResult.data ?? []) await deleteTextbox(userId, textbox.id);
-  for (const image of imagesResult.data ?? []) await deleteImage(userId, image.id);
+  const { data: images, error: imagesError } = await getDatabase()
+    .from("entity_image")
+    .select("storage_path")
+    .eq("entity_id", entityId);
+  throwIfError(imagesError, "Could not load entity images");
 
   const { error } = await getDatabase().from("entity").delete().eq("id", entityId);
   throwIfError(error, "Could not delete entity");
+  await removeStoredImagesAfterDeletion(
+    (images ?? []).map((image) => image.storage_path),
+    "entity",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recursive deletion and storage cleanup
+// ---------------------------------------------------------------------------
+
+async function getOwnedImagePaths(userId, { campaignId } = {}) {
+  let campaignsQuery = getDatabase().from("campaign").select("id").eq("user_id", userId);
+  if (campaignId) campaignsQuery = campaignsQuery.eq("id", campaignId);
+  const campaignsResult = await campaignsQuery;
+  throwIfError(campaignsResult.error, "Could not load campaigns for deletion");
+  const campaignIds = (campaignsResult.data ?? []).map((campaign) => campaign.id);
+  if (!campaignIds.length) return [];
+
+  const entitiesResult = await getDatabase()
+    .from("entity")
+    .select("id")
+    .in("campaign_id", campaignIds);
+  throwIfError(entitiesResult.error, "Could not load entities for deletion");
+  const entityIds = (entitiesResult.data ?? []).map((entity) => entity.id);
+  if (!entityIds.length) return [];
+
+  const imagesResult = await getDatabase()
+    .from("entity_image")
+    .select("storage_path")
+    .in("entity_id", entityIds);
+  throwIfError(imagesResult.error, "Could not load images for deletion");
+  return (imagesResult.data ?? []).map((image) => image.storage_path).filter(Boolean);
+}
+
+async function removeStoredImages(paths) {
+  const uniquePaths = [...new Set(paths.filter(Boolean))];
+  for (let index = 0; index < uniquePaths.length; index += 100) {
+    const batch = uniquePaths.slice(index, index + 100);
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { error } = await getDatabase().storage.from("entity-images").remove(batch);
+      lastError = error;
+      if (!error) break;
+    }
+    throwIfError(
+      lastError,
+      "Lore records were deleted, but their image files could not be removed",
+    );
+  }
+}
+
+async function removeStoredImagesAfterDeletion(paths, scope) {
+  try {
+    await removeStoredImages(paths);
+  } catch (error) {
+    // The database deletion has already committed and must still be reported
+    // as successful. Preserve the cleanup failure in server logs for repair.
+    console.error(`Deleted ${scope}, but image storage cleanup failed`, error);
+  }
+}
+
+export async function deleteUserAccount(userId, email, currentPassword) {
+  const verified = await signInForSession(email, currentPassword);
+  if (verified.authUserId !== userId) {
+    throw new Error("Current password verification did not match this account");
+  }
+
+  const imagePaths = await getOwnedImagePaths(userId);
+  const { error } = await getDatabase().auth.admin.deleteUser(userId);
+  throwIfError(error, "Could not delete account");
+  await removeStoredImagesAfterDeletion(imagePaths, "account");
 }
 
 export async function deleteCategory(userId, categoryId, deleteContents = false) {

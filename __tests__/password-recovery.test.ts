@@ -8,6 +8,7 @@ describe("password recovery", () => {
   const actions = source("../app/auth/actions.ts");
   const loader = source("../app/dataloader.js");
   const resetForm = source("../app/auth/reset-password/reset-password-form.tsx");
+  const resetCard = source("../app/auth/reset-password/reset-password-card.tsx");
   const resetRoute = source("../app/api/password-recovery/route.ts");
 
   it("links sign-in to an email recovery request", () => {
@@ -24,8 +25,10 @@ describe("password recovery", () => {
     expect(resetForm).toContain('name="confirmPassword"');
     expect(resetForm).toContain("Passwords do not match.");
     expect(resetForm).toContain('href="/auth/forgot-password"');
-    expect(resetForm).toContain("setPasswordVisible");
-    expect(resetForm).toContain("setConfirmationVisible");
+    expect(resetForm).toContain("<PasswordInput");
+    expect(resetForm).toContain("onSuccess();");
+    expect(resetCard).toContain('title="Your password has been updated."');
+    expect(resetCard).toContain("if (complete)");
   });
 
   it("reports resend throttling without exposing whether an account exists", () => {

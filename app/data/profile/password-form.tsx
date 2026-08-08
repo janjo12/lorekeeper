@@ -4,6 +4,8 @@ import { useActionState, useEffect, useRef } from "react";
 import { FormField } from "@/app/components/ui";
 import { FormMessage, SubmitButton } from "@/app/components/form-feedback";
 import { updatePassword } from "@/app/data/profile/actions";
+import PasswordInput from "@/app/components/password-input";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 
 export default function PasswordForm() {
   const [state, action, pending] = useActionState(updatePassword, {});
@@ -25,27 +27,21 @@ export default function PasswordForm() {
           htmlFor="current-password"
           errors={state.errors?.currentPassword}
         >
-          <input
+          <PasswordInput
             autoComplete="current-password"
             id="current-password"
             name="currentPassword"
             required
-            type="password"
           />
         </FormField>
-        <FormField
-          label="New password"
-          htmlFor="new-password"
-          errors={state.errors?.newPassword}
-        >
-          <input
+        <FormField label="New password" htmlFor="new-password" errors={state.errors?.newPassword}>
+          <PasswordInput
             autoComplete="new-password"
             id="new-password"
-            maxLength={72}
-            minLength={8}
+            maxLength={MAX_PASSWORD_LENGTH}
+            minLength={MIN_PASSWORD_LENGTH}
             name="newPassword"
             required
-            type="password"
           />
         </FormField>
         <FormField
@@ -53,14 +49,14 @@ export default function PasswordForm() {
           htmlFor="confirm-password"
           errors={state.errors?.confirmPassword}
         >
-          <input
+          <PasswordInput
             autoComplete="new-password"
             id="confirm-password"
-            maxLength={72}
-            minLength={8}
+            maxLength={MAX_PASSWORD_LENGTH}
+            minLength={MIN_PASSWORD_LENGTH}
             name="confirmPassword"
             required
-            type="password"
+            toggleLabel="confirmed password"
           />
         </FormField>
         <FormMessage success={state.success}>{state.message}</FormMessage>

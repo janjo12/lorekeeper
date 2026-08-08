@@ -6,6 +6,7 @@ import { SubmitButton } from "@/app/components/form-feedback";
 import AiApiManager from "@/app/data/profile/ai-api-manager";
 import { getAiApisForUser } from "@/app/dataloader";
 import PasswordForm from "@/app/data/profile/password-form";
+import AccountDeleteForm from "@/app/data/profile/account-delete-form";
 
 export default async function ProfilePage() {
   const session = await getSession();
@@ -31,6 +32,18 @@ export default async function ProfilePage() {
           </SubmitButton>
         </form>
       </div>
+      {session && (
+        <section className="danger-zone account-delete-zone">
+          <div>
+            <h2>Delete account</h2>
+            <p>
+              Permanently delete your account, owned campaigns, lore, comments, tags, invitations,
+              saved AI APIs, and uploaded images. This cannot be undone.
+            </p>
+          </div>
+          <AccountDeleteForm username={session.username} />
+        </section>
+      )}
     </section>
   );
 }

@@ -61,6 +61,24 @@ async function readJson(response) {
   }
 }
 
+async function canReachLocalServer(chatUrl) {
+  const probeUrl = new URL("/", chatUrl);
+  try {
+    // An opaque no-CORS response is sufficient here: even a 404 proves that
+    // Chrome reached the local process. No credentials are sent by this probe.
+    await fetch(probeUrl, {
+      method: "GET",
+      mode: "no-cors",
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+      targetAddressSpace: "local",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function callAnythingLlm({ apiKey, baseUrl, prompt, purpose, sessionId }) {
   const timeout = requestTimeout(purpose);
   const chatUrl = anythingLlmChatUrl(baseUrl);
@@ -85,8 +103,13 @@ async function callAnythingLlm({ apiKey, baseUrl, prompt, purpose, sessionId }) 
       throw new Error(`The AnythingLLM request timed out after ${timeout.label}.`);
     }
     if (isLoopback && globalThis.location?.protocol === "https:") {
+      if (await canReachLocalServer(chatUrl)) {
+        throw new Error(
+          "Chrome can reach local AnythingLLM, so Local network access is not the problem. The workspace chat request was blocked before Lorekeeper could read its response. Confirm the workspace URL and API key, and check AnythingLLM’s CORS settings for this site’s exact origin.",
+        );
+      }
       throw new Error(
-        "Chrome or Edge blocked access to local AnythingLLM, or AnythingLLM is not running. Open this site’s controls beside the address bar, set Local network access to Allow, reload the page, and confirm http://localhost:3001 opens in this same browser.",
+        "Chrome could not reach local AnythingLLM. AnythingLLM is either not running for this browser, or this site is still blocked from local network access. Confirm http://localhost:3001 opens in Chrome, then reload this page.",
       );
     }
     throw new Error(
@@ -103,7 +126,7 @@ async function callAnythingLlm({ apiKey, baseUrl, prompt, purpose, sessionId }) 
 }
 
 /** Lorekeeper's only AI-provider boundary. Runs in the user's browser for local providers. */
-export async function generateAiResponse({
+async function generateAiResponse({
   provider,
   apiKey,
   baseUrl,

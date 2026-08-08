@@ -3,16 +3,17 @@ import { EntityCreationControls } from "@/app/data/campaign-lore/creation-contro
 import ConfirmDeleteButton from "@/app/components/confirm-delete-button";
 import { ActionForm, SubmitButton } from "@/app/components/form-feedback";
 import { FormField } from "@/app/components/ui";
-import ContentRevealButton from "@/app/data/campaign-lore/content-reveal-button";
 import EntityLinks, { type LinkableEntity } from "@/app/data/campaign-lore/entity-links";
 import EntityComments from "@/app/data/campaign-lore/entity-comments";
 import DismissibleDetails from "@/app/components/dismissible-details";
 import {
+  ContentActions,
+  ContentVisibilityHeading,
+} from "@/app/data/campaign-lore/entity-content-controls";
+import {
   attachEntityTag,
   editEntity,
-  editEntityContent,
   removeEntity,
-  removeEntityContent,
   updateEntityCoOwners,
 } from "@/app/data/actions";
 
@@ -46,125 +47,6 @@ type EntityData = {
   available_tags: Array<{ id: string; name: string }>;
   comments: Array<{ id: string; username: string; content: string; created_at: string }>;
 };
-
-function ContentActions({
-  id,
-  type,
-  name,
-  value,
-}: {
-  id: string;
-  type: "textbox" | "image";
-  name: string;
-  value: string;
-}) {
-  return (
-    <div className="content-actions">
-      <DismissibleDetails className="content-edit">
-        <summary>Edit</summary>
-        <ActionForm
-          action={editEntityContent}
-          className="content-edit-form"
-          errorMessage="We couldn’t save this content. Check the details and try again."
-        >
-          <input type="hidden" name="contentId" value={id} />
-          <input type="hidden" name="contentType" value={type} />
-          <small>
-            Exact, case-sensitive entity names become links when that entity is visible to the
-            reader.
-          </small>
-          <FormField label="Name" variant="material">
-            <input name="name" defaultValue={name} required maxLength={80} />
-          </FormField>
-          {type !== "image" && (
-            <FormField label="Content" variant="material">
-              <textarea name="value" defaultValue={value} rows={6} required />
-            </FormField>
-          )}
-          <div className="dialog-actions">
-            <SubmitButton variant="filled" pendingLabel="Saving…">
-              Save
-            </SubmitButton>
-          </div>
-        </ActionForm>
-      </DismissibleDetails>
-      <ActionForm
-        action={removeEntityContent}
-        errorMessage={`We couldn’t delete this ${type}. Please try again.`}
-      >
-        <input type="hidden" name="contentId" value={id} />
-        <input type="hidden" name="contentType" value={type} />
-        <ConfirmDeleteButton
-          className="content-action is-danger"
-          itemName={type === "image" ? `the image “${name}”` : `the textbox “${name}”`}
-        />
-      </ActionForm>
-    </div>
-  );
-}
-
-function RevealIcon({ revealed }: { revealed: boolean }) {
-  return (
-    <span
-      className={`reveal-icon${revealed ? " is-revealed" : " is-hidden"}`}
-      title={revealed ? "Revealed" : "Hidden"}
-    >
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-        <circle cx="12" cy="12" r="2.75" />
-        {!revealed && <path d="m4 4 16 16" />}
-      </svg>
-    </span>
-  );
-}
-
-function ContentVisibilityHeading({
-  id,
-  type,
-  name,
-  campaignId,
-  entities,
-  players,
-  revealedToAll,
-  revealedProfileIds,
-  currentUserId,
-  isGm,
-}: {
-  id: string;
-  type: "textbox" | "image";
-  name: string;
-  campaignId: string;
-  entities: LinkableEntity[];
-  players: Player[];
-  revealedToAll: boolean;
-  revealedProfileIds: string[];
-  currentUserId: string;
-  isGm: boolean;
-}) {
-  const showVisibility = isGm || !revealedToAll;
-  const isRevealed = revealedToAll || revealedProfileIds.length > 0;
-  return (
-    <div className="content-heading-group">
-      <div className="content-heading-line">
-        {showVisibility && <RevealIcon revealed={isRevealed} />}
-        <h2>
-          <EntityLinks text={name} campaignId={campaignId} entities={entities} />
-        </h2>
-        {showVisibility && (
-          <ContentRevealButton
-            contentId={id}
-            contentType={type}
-            players={players}
-            revealedToAll={revealedToAll}
-            revealedProfileIds={revealedProfileIds}
-            canChangeReveal={isGm}
-            currentUserId={currentUserId}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
 
 export default function EntityView({
   data,
@@ -214,54 +96,77 @@ export default function EntityView({
                 <FormField label="Name" variant="material">
                   <input name="name" defaultValue={data.entity.name} required />
                 </FormField>
-                {isGm ? <FormField label="Category" variant="material">
-                  <select name="categoryId" defaultValue={data.entity.category_id || ""}>
-                    <option value="">No category</option>
-                    {categories.map((category) => (
-                      <option value={category.id} key={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </FormField> : <input type="hidden" name="categoryId" value={data.entity.category_id || ""} />}
+                {isGm ? (
+                  <FormField label="Category" variant="material">
+                    <select name="categoryId" defaultValue={data.entity.category_id || ""}>
+                      <option value="">No category</option>
+                      {categories.map((category) => (
+                        <option value={category.id} key={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                ) : (
+                  <input type="hidden" name="categoryId" value={data.entity.category_id || ""} />
+                )}
                 <SubmitButton variant="filled" pendingLabel="Saving…">
                   Save
                 </SubmitButton>
               </ActionForm>
             </DismissibleDetails>
-            {isGm && <DismissibleDetails className="edit-details">
-              <summary className="secondary-button">Co-owners</summary>
-              <ActionForm action={updateEntityCoOwners} className="edit-entity-form" errorMessage="We couldn’t update this entity’s co-owners.">
-                <input type="hidden" name="entityId" value={data.entity.id} />
-                <fieldset className="reveal-player-options">
-                  <legend>Campaign players</legend>
-                  {data.campaign_players.length ? data.campaign_players.map((player) => (
-                    <label className="reveal-option" key={player.id}>
-                      <input type="checkbox" name="profileId" value={player.id} defaultChecked={coOwnerIds.has(player.id)} />
-                      @{player.username}
-                    </label>
-                  )) : <p>Add campaign players before assigning co-owners.</p>}
-                </fieldset>
-                <label className="checkbox-row">
-                  <input type="checkbox" name="sendEmail" value="true" />
-                  Email selected players about co-ownership
-                </label>
-                <SubmitButton variant="filled" pendingLabel="Saving…">Save co-owners</SubmitButton>
-              </ActionForm>
-            </DismissibleDetails>}
-            {isGm && <ActionForm
-              action={removeEntity}
-              errorMessage="We couldn’t delete this entity. Please try again."
-            >
-              <input type="hidden" name="entityId" value={data.entity.id} />
-              <input type="hidden" name="campaignId" value={data.campaign.id} />
-              <ConfirmDeleteButton
-                className="secondary-button is-danger"
-                warningMessage={`Are you sure you want to delete the entity “${data.entity.name}”? All textboxes and images associated with it will be deleted with it. This cannot be undone.`}
+            {isGm && (
+              <DismissibleDetails className="edit-details">
+                <summary className="secondary-button">Co-owners</summary>
+                <ActionForm
+                  action={updateEntityCoOwners}
+                  className="edit-entity-form"
+                  errorMessage="We couldn’t update this entity’s co-owners."
+                >
+                  <input type="hidden" name="entityId" value={data.entity.id} />
+                  <fieldset className="reveal-player-options">
+                    <legend>Campaign players</legend>
+                    {data.campaign_players.length ? (
+                      data.campaign_players.map((player) => (
+                        <label className="reveal-option" key={player.id}>
+                          <input
+                            type="checkbox"
+                            name="profileId"
+                            value={player.id}
+                            defaultChecked={coOwnerIds.has(player.id)}
+                          />
+                          @{player.username}
+                        </label>
+                      ))
+                    ) : (
+                      <p>Add campaign players before assigning co-owners.</p>
+                    )}
+                  </fieldset>
+                  <label className="checkbox-row">
+                    <input type="checkbox" name="sendEmail" value="true" />
+                    Email selected players about co-ownership
+                  </label>
+                  <SubmitButton variant="filled" pendingLabel="Saving…">
+                    Save co-owners
+                  </SubmitButton>
+                </ActionForm>
+              </DismissibleDetails>
+            )}
+            {isGm && (
+              <ActionForm
+                action={removeEntity}
+                errorMessage="We couldn’t delete this entity. Please try again."
               >
-                Delete entity
-              </ConfirmDeleteButton>
-            </ActionForm>}
+                <input type="hidden" name="entityId" value={data.entity.id} />
+                <input type="hidden" name="campaignId" value={data.campaign.id} />
+                <ConfirmDeleteButton
+                  className="secondary-button is-danger"
+                  warningMessage={`Are you sure you want to delete the entity “${data.entity.name}”? All textboxes and images associated with it will be deleted with it. This cannot be undone.`}
+                >
+                  Delete entity
+                </ConfirmDeleteButton>
+              </ActionForm>
+            )}
           </div>
         )}
       </header>
@@ -349,26 +254,28 @@ export default function EntityView({
       <section className="entity-meta">
         <div>
           <h2>Tags</h2>
-          {isGm && <ActionForm
-            action={attachEntityTag}
-            className="inline-create-form compact-inline-form"
-            errorMessage="We couldn’t add that tag. Please try again."
-          >
-            <input type="hidden" name="entityId" value={data.entity.id} />
-            <select name="tagId" required>
-              <option value="">Choose a tag</option>
-              {data.available_tags
-                .filter((tag) => !attached.has(tag.id))
-                .map((tag) => (
-                  <option value={tag.id} key={tag.id}>
-                    {tag.name}
-                  </option>
-                ))}
-            </select>
-            <SubmitButton variant="secondary" pendingLabel="Adding…">
-              Add tag
-            </SubmitButton>
-          </ActionForm>}
+          {isGm && (
+            <ActionForm
+              action={attachEntityTag}
+              className="inline-create-form compact-inline-form"
+              errorMessage="We couldn’t add that tag. Please try again."
+            >
+              <input type="hidden" name="entityId" value={data.entity.id} />
+              <select name="tagId" required>
+                <option value="">Choose a tag</option>
+                {data.available_tags
+                  .filter((tag) => !attached.has(tag.id))
+                  .map((tag) => (
+                    <option value={tag.id} key={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+              </select>
+              <SubmitButton variant="secondary" pendingLabel="Adding…">
+                Add tag
+              </SubmitButton>
+            </ActionForm>
+          )}
         </div>
         <EntityComments entityId={data.entity.id} initialComments={data.comments} />
       </section>

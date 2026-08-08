@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { completePasswordReset } from "@/app/dataloader";
+import { passwordCreationSchema } from "@/lib/password-policy";
 
 const requestSchema = z.object({
-  password: z.string().min(8).max(72),
+  password: passwordCreationSchema,
 });
 
 export async function POST(request: Request) {
