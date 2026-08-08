@@ -231,6 +231,32 @@ describe("dataloader", () => {
     expect(createClient).toHaveBeenCalledOnce();
   });
 
+  it("resets only the user identified by a valid recovery access token", async () => {
+    const recoveryAuth = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "recovered-user" } },
+          error: null,
+        }),
+      },
+    };
+    const database = {
+      auth: {
+        admin: {
+          updateUserById: vi.fn().mockResolvedValue({ data: {}, error: null }),
+        },
+      },
+    };
+    createClient.mockReturnValueOnce(recoveryAuth).mockReturnValueOnce(database);
+    const { completePasswordReset } = await loadDataloader();
+
+    await expect(completePasswordReset("recovery-token", "reused-password")).resolves.toBeUndefined();
+    expect(recoveryAuth.auth.getUser).toHaveBeenCalledWith("recovery-token");
+    expect(database.auth.admin.updateUserById).toHaveBeenCalledWith("recovered-user", {
+      password: "reused-password",
+    });
+  });
+
   it("surfaces a duplicate email instead of replacing its profile", async () => {
     const database = {
       auth: {

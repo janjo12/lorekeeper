@@ -71,13 +71,6 @@ const passwordSchema = z
         message: "Passwords do not match.",
       });
     }
-    if (values.currentPassword === values.newPassword) {
-      context.addIssue({
-        code: "custom",
-        path: ["newPassword"],
-        message: "Choose a password different from your current password.",
-      });
-    }
   });
 
 export async function updatePassword(

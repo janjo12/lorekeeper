@@ -152,6 +152,11 @@ input {
   gap: 1.1rem;
   margin-top: 1.75rem;
 }
+.password-reset-request-form > button {
+  width: 100%;
+  justify-self: center;
+  text-align: center;
+}
 .field {
   display: grid;
   gap: 0.4rem;
@@ -1585,6 +1590,8 @@ input {
   display: inline-flex;
   align-items: center;
   justify-self: start;
+  width: max-content;
+  margin: 0 auto 1.75rem 0;
   gap: 0.45rem;
   padding: 0.55rem 0.8rem;
   border: 1px solid var(--accent);

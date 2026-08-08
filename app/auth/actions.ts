@@ -14,15 +14,22 @@ export type AuthState = {
     confirmPassword?: string[];
   };
   message?: string;
+  success?: boolean;
 };
 
-const passwordSchema = z.string().min(8, "Password must be at least 8 characters.").max(72);
+const passwordCreationSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters.")
+  .max(72);
 const loginSchema = z.object({
   email: z.email("Enter a valid email address.").trim().toLowerCase(),
-  password: passwordSchema,
+  // Login must accept any existing credential. Password policy belongs only
+  // to password creation and must not prevent legacy credentials from signing in.
+  password: z.string(),
 });
 const signupSchema = loginSchema
   .extend({
+    password: passwordCreationSchema,
     username: z
       .string()
       .trim()
@@ -81,8 +88,46 @@ export async function forgotPassword(_state: AuthState, formData: FormData): Pro
     await requestPasswordReset(email.data, `${origin}/auth/reset-password`);
   } catch (error) {
     console.error("Password recovery failed", error);
+    const throttlingMessage = passwordRecoveryThrottlingMessage(error);
+    if (throttlingMessage) {
+      return {
+        message: throttlingMessage,
+        success: false,
+      };
+    }
+
+    // Keep the response account-enumeration safe. Unknown addresses and
+    // provider failures receive the same outward response.
+    return {
+      message: "If that email belongs to an account, a password reset link is on its way.",
+      success: true,
+    };
   }
-  return { message: "If that email belongs to an account, a password reset link is on its way." };
+  return {
+    message: "If that email belongs to an account, a password reset link is on its way.",
+    success: true,
+  };
+}
+
+function passwordRecoveryThrottlingMessage(error: unknown) {
+  if (!(error instanceof Error)) return undefined;
+
+  const seconds = error.message.match(/after\s+(\d+)\s+seconds?/i)?.[1];
+  if (/security purposes|after\s+\d+\s+seconds?/i.test(error.message)) {
+    return seconds
+      ? `A reset email was requested recently. Try again in ${seconds} seconds.`
+      : "A reset email was requested recently. Wait about a minute, then try again.";
+  }
+
+  const code = (error as Error & { code?: string }).code;
+  if (code === "over_email_send_rate_limit" || /email.*rate limit|rate limit.*email/i.test(error.message)) {
+    return "The email service has reached its sending limit. Try again later; with Supabase’s built-in email service, this can take up to an hour.";
+  }
+  if (code === "over_request_rate_limit" || /rate limit/i.test(error.message)) {
+    return "Too many password reset requests have been made. Please try again later.";
+  }
+
+  return undefined;
 }
 
 export async function logout() {

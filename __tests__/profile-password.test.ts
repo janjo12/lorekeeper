@@ -24,5 +24,6 @@ describe("profile password management", () => {
     expect(actions).toContain("changeUserPassword(");
     expect(actions).toContain("Your current password is incorrect.");
     expect(actions).toContain("await createSession(session, tokens)");
+    expect(actions).not.toContain("different from your current password");
   });
 });

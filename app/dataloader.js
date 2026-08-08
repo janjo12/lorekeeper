@@ -148,6 +148,20 @@ export async function requestPasswordReset(email, redirectTo) {
   throwIfError(error, "Could not send password reset email");
 }
 
+export async function completePasswordReset(accessToken, password) {
+  // Validate the emailed recovery session before using privileged Auth access.
+  // The recovered Auth user id is the only account this operation may update.
+  const { data, error: identityError } = await createAuthClient().auth.getUser(accessToken);
+  throwIfError(identityError, "Could not validate password recovery session");
+  if (!data.user) throw new Error("Could not validate password recovery session: user not found");
+
+  // Supabase's ordinary user update rejects reuse of the current password.
+  // Admin update does not need the old password, but is safe here because the
+  // target id comes exclusively from the verified recovery access token.
+  const { error } = await getDatabase().auth.admin.updateUserById(data.user.id, { password });
+  throwIfError(error, "Could not reset password");
+}
+
 export async function getNotificationRecipient(profileId) {
   const [{ data: profile, error: profileError }, { data: auth, error: authError }] =
     await Promise.all([
