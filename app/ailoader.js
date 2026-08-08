@@ -71,7 +71,7 @@ async function canReachLocalServer(chatUrl) {
       mode: "no-cors",
       cache: "no-store",
       signal: AbortSignal.timeout(5_000),
-      targetAddressSpace: "local",
+      targetAddressSpace: "loopback",
     });
     return true;
   } catch {
@@ -96,7 +96,7 @@ async function callAnythingLlm({ apiKey, baseUrl, prompt, purpose, sessionId }) 
       body: JSON.stringify({ message: prompt, mode: "chat", sessionId }),
       cache: "no-store",
       signal: AbortSignal.timeout(timeout.milliseconds),
-      ...(isLoopback ? { targetAddressSpace: "local" } : {}),
+      ...(isLoopback ? { targetAddressSpace: "loopback" } : {}),
     });
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
